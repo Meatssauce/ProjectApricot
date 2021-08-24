@@ -7,4 +7,5 @@ request_headers = {
     'Upgrade-Insecure-Requests': '1',
     # 'Referer': 'https://www.google.com/'
 }
-sources = {'tvfy': 'https://theyvoteforyou.org.au/', 'pa': 'https://postcodes-australia.com/'}
+sources = {'tvfy': 'https://theyvoteforyou.org.au/', 'pa': 'https://postcodes-australia.com/',
+           'politicians': 'https://en.wikipedia.org/wiki/List_of_Australian_politicians'}
