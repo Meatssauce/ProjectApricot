@@ -1,10 +1,7 @@
 import logging
-import os
-
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import numpy as np
 from tqdm import tqdm
 from parameters import sources, request_headers
 import re
@@ -82,6 +79,8 @@ def get_politicians() -> dict:
                 # politicians_data['electorate'].append(elements[2].text)
 
         return members, parties
+
+    logging.info('Starting to scrape politicians from Wikipedia')
 
     politicians_data = {'member': [], 'party': []}
 
