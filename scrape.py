@@ -1,10 +1,25 @@
 import logging
+import random
+
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from tqdm import tqdm
-from parameters import sources, request_headers
 import re
+
+
+# Parameters
+from utils import Politician
+
+request_headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7) Gecko/2009021910 Firefox/3.0.7',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,'
+              'application/signed-exchange;v=b3',
+    'Accept-Encoding': 'gzip',
+    'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
+    'Upgrade-Insecure-Requests': '1',
+    # 'Referer': 'https://www.google.com/'
+}
 
 
 # Get get parsed html from a url
@@ -14,9 +29,13 @@ def get_soup(url: str) -> BeautifulSoup:
     return soup
 
 
+def get_root(url: str) -> str:
+    return re.findall(r'^(http[s]?://[^/]+/)', url)[0]
+
+
 def get_postcodes() -> list:
     post_codes = []
-    seed_url = sources['pa'] + 'state-postcodes/'
+    seed_url = 'https://postcodes-australia.com/state-postcodes/'
     states = ['act', 'nsw', 'nt', 'qld', 'sa', 'tas', 'vic', 'wa']
 
     logging.debug(f'Starting to scrape post codes from f{len(states)} states')
@@ -35,7 +54,7 @@ def get_postcodes() -> list:
     return post_codes
 
 
-def get_politicians() -> dict:
+def scrape_all_parliment_members() -> dict:
     """
     Scrapes all Australian politicians according to Wikipedia.
 
@@ -84,8 +103,8 @@ def get_politicians() -> dict:
 
     politicians_data = {'member': [], 'party': []}
 
-    seed_url = sources['politicians']
-    hostname = re.findall(r'^(http[s]?://[^/]+/)', seed_url)[0]
+    seed_url = 'https://en.wikipedia.org/wiki/List_of_Australian_politicians'
+    hostname = get_root(seed_url)
     soup = get_soup(seed_url)
     main_content = soup.find('div', {'class': 'mw-parser-output'})
     sublists = main_content.findAll('ul', recursive=False)
@@ -107,10 +126,60 @@ def get_politicians() -> dict:
     return politicians_data
 
 
+def scrape_australian_parliament_members() -> dict:
+    def _scrape_politician_info(url: str, politicians_data: dict) -> dict:
+        soup = get_soup(url)
+        summary = soup.find('div', class_='media-body')
+
+        politicians_data['name'].append(summary.find('h1').find('span').text)
+        politicians_data['party'].append(summary.find('span', class_='org').text)
+        politicians_data['role'].append(summary.find('span', class_='title').text)
+        politicians_data['electorate'].append(summary.find('span', class_='electorate').text)
+        try:
+            politicians_data['rebellion'].append(summary.find('span', class_='member-rebellions').text)
+            politicians_data['attendance'].append(summary.find('span', class_='member-attendance').text)
+        except AttributeError:
+            politicians_data['rebellion'].append('')
+            politicians_data['attendance'].append('')
+
+        issues = soup.find('ul', class_='policy-comparision-list')
+        policies = [(issue.a['href'], issue.text) for issue in issues.findAll('li', recursive=False)]
+        politicians_data['policy'].append(policies)
+
+        return politicians_data
+
+    logging.info('Starting to scrape politicians from TheyVoteForYou')
+
+    politicians_data = {'name': [], 'party': [], 'role': [], 'electorate': [], 'rebellion': [], 'attendance': [],
+                        'policy': []}
+
+    seed_url = 'https://theyvoteforyou.org.au/people'
+    hostname = get_root(seed_url)
+    soup = get_soup(seed_url)
+    list_ = soup.find('div', {'class': 'container main-content'}).find('ol')
+    to_visit = []
+    for item in list_.findAll('li', recursive=False):
+        to_visit.append(hostname + item.find('a')['href'])
+    random.shuffle(to_visit)  # shuffle for anti-crawler detection
+
+    visited = set()
+    for url in tqdm(to_visit):
+        if url in visited:
+            continue
+
+        politicians_data = _scrape_politician_info(url, politicians_data)
+
+    return politicians_data
+
+
 # Tests
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     # post_codes = get_postcodes()
-    politicans_data = get_politicians()
+    # politicans_data = scrape_all_parliment_members()
+    # df = pd.DataFrame.from_dict(politicans_data)
+    # df.to_csv('data/australian_and_state_parliament_members.csv', index=False)
+
+    politicans_data = scrape_australian_parliament_members()
     df = pd.DataFrame.from_dict(politicans_data)
-    df.to_csv('data/politicians_data.csv', index=False)
+    df.to_csv('data/australian_parliament_members_data.csv', index=False)
