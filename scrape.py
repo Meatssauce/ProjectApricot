@@ -29,11 +29,17 @@ def get_soup(url: str) -> BeautifulSoup:
     return soup
 
 
+# Get hostname aka root url from a url
 def get_root(url: str) -> str:
     return re.findall(r'^(http[s]?://[^/]+/)', url)[0]
 
 
-def get_postcodes() -> list:
+# Remove commas and quotation marks from string
+def sanitised(string: str) -> str:
+    return re.sub(r'[,\"\']+', '', string)
+
+
+def scrape_postcodes_au() -> list:
     post_codes = []
     seed_url = 'https://postcodes-australia.com/state-postcodes/'
     states = ['act', 'nsw', 'nt', 'qld', 'sa', 'tas', 'vic', 'wa']
@@ -82,6 +88,7 @@ def scrape_all_parliment_members() -> dict:
                 member = ' '.join(reversed(member.split(', ')))
             else:
                 member = elements[0].text
+            member = sanitised(member)
             member = re.sub(r'\s*(\[.*\]|\d)$', '', member)
             member = re.sub(r'^(Hon|Dr|Hon Dr)\s*', '', member)
             members.append(member)
@@ -131,27 +138,36 @@ def scrape_australian_parliament_members() -> dict:
         soup = get_soup(url)
         summary = soup.find('div', class_='media-body')
 
-        politicians_data['name'].append(summary.find('h1').find('span').text)
-        politicians_data['party'].append(summary.find('span', class_='org').text)
-        politicians_data['role'].append(summary.find('span', class_='title').text)
-        politicians_data['electorate'].append(summary.find('span', class_='electorate').text)
+        politicians_data['name'].append(sanitised(summary.find('h1').find('span').text))
+        politicians_data['party'].append(sanitised(summary.find('span', class_='org').text))
+        politicians_data['role'].append(sanitised(summary.find('span', class_='title').text))
+        politicians_data['electorate'].append(sanitised(summary.find('span', class_='electorate').text))
         try:
-            politicians_data['rebellion'].append(summary.find('span', class_='member-rebellions').text)
-            politicians_data['attendance'].append(summary.find('span', class_='member-attendance').text)
+            politicians_data['rebellion'].append(sanitised(summary.find('span', class_='member-rebellions').text))
+            politicians_data['attendance'].append(sanitised(summary.find('span', class_='member-attendance').text))
         except AttributeError:
             politicians_data['rebellion'].append('')
             politicians_data['attendance'].append('')
 
         issues = soup.find('ul', class_='policy-comparision-list')
-        policies = [(issue.a['href'], issue.text) for issue in issues.findAll('li', recursive=False)]
-        politicians_data['policy'].append(policies)
+        policies = [(issue.a['href'], sanitised(issue.text)) for issue in issues.findAll('li', recursive=False)]
+        politicians_data['policies'].append(policies)
+
+        friends_page = get_soup(url + '/friends')
+        friends_table = friends_page.find('table')
+
+        friends = []
+        for row in friends_table.findAll('tr', recursive=False):
+            cells = row.findAll('td')
+            friends.append((sanitised(cell.text) for cell in cells))
+        politicians_data['friends'].append(friends)
 
         return politicians_data
 
     logging.info('Starting to scrape politicians from TheyVoteForYou')
 
     politicians_data = {'name': [], 'party': [], 'role': [], 'electorate': [], 'rebellion': [], 'attendance': [],
-                        'policy': []}
+                        'policies': [], 'friends': []}
 
     seed_url = 'https://theyvoteforyou.org.au/people'
     hostname = get_root(seed_url)
@@ -170,6 +186,26 @@ def scrape_australian_parliament_members() -> dict:
         politicians_data = _scrape_politician_info(url, politicians_data)
 
     return politicians_data
+
+
+def scrape_politician_donations():
+    """Scrape info about a parliament member's donors and donations"""
+    pass
+
+
+def scrape_australian_party_donations():
+    """Scrape info about a party's donors and donations"""
+    pass
+
+
+def find_politician_stakes():
+    """Scrape info about how much stake a politician holds and in what area"""
+    pass
+
+
+def find_party_stakes():
+    """Scrape info about how much stake a party holds and in what area"""
+    pass
 
 
 # Tests
