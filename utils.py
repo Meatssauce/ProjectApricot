@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
@@ -16,10 +16,13 @@ class VoteType(Enum):
 @dataclass
 class Party:
     name: str
-    simple_name: str
-    members: set
+    members: set = field(default=set(), init=False)
     start_date: datetime = None
     end_date: datetime = None
+
+    def add(self, member):
+        member.party = self
+        self.members.add(member)
 
 
 @dataclass

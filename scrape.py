@@ -1,16 +1,20 @@
 import logging
 import random
 
+import numpy as np
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from tqdm import tqdm
 import re
 
+from typing import Tuple, List, Dict
+from collections import namedtuple, defaultdict
+from joblib import load, dump
 
-# Parameters
 from utils import Politician
 
+# Parameters
 request_headers = {
     'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7) Gecko/2009021910 Firefox/3.0.7',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,'
@@ -25,8 +29,7 @@ request_headers = {
 # Get get parsed html from a url
 def get_soup(url: str) -> BeautifulSoup:
     response = requests.get(url, headers=request_headers)
-    soup = BeautifulSoup(response.content, 'html5lib')
-    return soup
+    return BeautifulSoup(response.content, 'html5lib')
 
 
 # Get hostname aka root url from a url
@@ -36,7 +39,8 @@ def get_root(url: str) -> str:
 
 # Remove commas and quotation marks from string
 def sanitised(string: str) -> str:
-    return re.sub(r'[,\"\']+', '', string)
+    string = re.sub(r'\W', ' ', string)  # remove symbols and extra white space
+    return re.sub(r'(^\s+|\s+$)', '', string)  # remove white space at beginning and end
 
 
 def scrape_postcodes_au() -> list:
@@ -49,7 +53,7 @@ def scrape_postcodes_au() -> list:
     for state in tqdm(states):
         url = seed_url + state
         soup = get_soup(url)
-        list_ = soup.find('ul', {'class': 'pclist'})
+        list_ = soup.find('ul', class_='pclist')
         if not list_ and soup.find('div', {'id': 'content'}).find('h1').text == 'Error':
             raise ValueError('Failed to find list on the page. Check if url is correct.')
 
@@ -133,59 +137,81 @@ def scrape_all_parliment_members() -> dict:
     return politicians_data
 
 
-def scrape_australian_parliament_members() -> dict:
-    def _scrape_politician_info(url: str, politicians_data: dict) -> dict:
+# def scrape_policy_voting_histories(soup: BeautifulSoup, url: str) -> List[dict]:
+#     # Scrape politician's voting history
+#     policies = soup.find('ul', class_='policy-comparision-list')
+#     policies = [(url + policy.a['href'], sanitised(policy.text))
+#                 for policy in policies.findAll('li', recursive=False)]
+#     df_policies = pd.DataFrame(policies, columns=['URL', 'Description'])
+#     return df_policies
+
+
+def scrape_australian_parliament_members() -> Tuple[pd.DataFrame, defaultdict]:
+    def _scrape_politician_info(url: str, data: defaultdict, matrix: defaultdict) -> None:
+        # Scrape info about politician
         soup = get_soup(url)
         summary = soup.find('div', class_='media-body')
-
-        politicians_data['name'].append(sanitised(summary.find('h1').find('span').text))
-        politicians_data['party'].append(sanitised(summary.find('span', class_='org').text))
-        politicians_data['role'].append(sanitised(summary.find('span', class_='title').text))
-        politicians_data['electorate'].append(sanitised(summary.find('span', class_='electorate').text))
+        name = sanitised(summary.find('h1').find('span').text)
+        # todo: find regex that does preserves O'Bryan and Foo-Zoo but not O', 'O, Foo- or -Foo
+        data['Name'].append(name)
+        data['Party'].append(sanitised(summary.find('span', class_='org').text))
+        data['Role'].append(sanitised(summary.find('span', class_='title').text))
+        data['Electorate'].append(sanitised(summary.find('span', class_='electorate').text))
         try:
-            politicians_data['rebellion'].append(sanitised(summary.find('span', class_='member-rebellions').text))
-            politicians_data['attendance'].append(sanitised(summary.find('span', class_='member-attendance').text))
+            rebellion = summary.find('span', class_='member-rebellions').text
+            if 'never' not in rebellion.lower():
+                rebellion = re.search(r'\d+\.?\d*', rebellion)[0]
+                rebellion = float(rebellion) / 100
+            else:
+                rebellion = 0.
+            data['Rebellion'].append(rebellion)
+
+            attendance = summary.find('span', class_='member-attendance').text
+            attendance = re.search(r'\d+\.?\d*', attendance)[0]
+            attendance = float(attendance) / 100
+            data['Attendance'].append(attendance)
         except AttributeError:
-            politicians_data['rebellion'].append('')
-            politicians_data['attendance'].append('')
+            data['Rebellion'].append('')
+            data['Attendance'].append(np.nan)
 
-        issues = soup.find('ul', class_='policy-comparision-list')
-        policies = [(issue.a['href'], sanitised(issue.text)) for issue in issues.findAll('li', recursive=False)]
-        politicians_data['policies'].append(policies)
-
-        friends_page = get_soup(url + '/friends')
-        friends_table = friends_page.find('table')
-
-        friends = []
-        for row in friends_table.findAll('tr', recursive=False):
+        # Scrape info about politician's friends
+        page = get_soup(url + '/friends')
+        table = page.find('table')
+        for row in table.findAll('tr')[1:]:
             cells = row.findAll('td')
-            friends.append((sanitised(cell.text) for cell in cells))
-        politicians_data['friends'].append(friends)
+            other_name = sanitised(cells[1].text)
 
-        return politicians_data
+            if name not in matrix or other_name not in matrix:
+                agreement = re.match(r'\d+\.?\d*', cells[0].text)[0]
+                agreement = float(agreement) / 100
+                matrix[name][other_name] = agreement
+                matrix[other_name][name] = agreement
 
     logging.info('Starting to scrape politicians from TheyVoteForYou')
 
-    politicians_data = {'name': [], 'party': [], 'role': [], 'electorate': [], 'rebellion': [], 'attendance': [],
-                        'policies': [], 'friends': []}
-
+    # Scrape url of all parliament members
     seed_url = 'https://theyvoteforyou.org.au/people'
     hostname = get_root(seed_url)
     soup = get_soup(seed_url)
-    list_ = soup.find('div', {'class': 'container main-content'}).find('ol')
+    list_ = soup.find('div', class_='container main-content').find('ol')
     to_visit = []
     for item in list_.findAll('li', recursive=False):
         to_visit.append(hostname + item.find('a')['href'])
     random.shuffle(to_visit)  # shuffle for anti-crawler detection
 
+    # Scrape info of all parliament members
+    politicians_data = defaultdict(list)
+    friendship_matrix = defaultdict(defaultdict)
     visited = set()
     for url in tqdm(to_visit):
         if url in visited:
             continue
+        visited.add(url)
 
-        politicians_data = _scrape_politician_info(url, politicians_data)
+        _scrape_politician_info(url, politicians_data, friendship_matrix)
+    df_politicians = pd.DataFrame.from_dict(politicians_data)
 
-    return politicians_data
+    return df_politicians, friendship_matrix
 
 
 def scrape_politician_donations():
@@ -216,6 +242,8 @@ if __name__ == '__main__':
     # df = pd.DataFrame.from_dict(politicans_data)
     # df.to_csv('data/australian_and_state_parliament_members.csv', index=False)
 
-    politicans_data = scrape_australian_parliament_members()
-    df = pd.DataFrame.from_dict(politicans_data)
-    df.to_csv('data/australian_parliament_members_data.csv', index=False)
+    df_politicians, friendship_matrix = scrape_australian_parliament_members()
+
+    df_politicians.to_csv('data/australian_parliament_members_data.csv', index=False)
+    with open('data/friendship_matrix.joblib', 'wb') as f:
+        dump(friendship_matrix, f)
