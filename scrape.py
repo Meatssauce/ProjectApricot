@@ -147,11 +147,16 @@ def scrape_all_parliment_members() -> dict:
 
 
 def scrape_politician_info(url: str, politicians_data: defaultdict, voting_history_data: defaultdict,
-                           matrix: defaultdict) -> None:
-    soup = get_soup(url)
+                           matrix: defaultdict, shortcut=False) -> None:
+    def scrape_policy_url_from_intermediary(url: str) -> str:
+        """Scrapes absolute url to policy from the politician policy details page."""
+        title = get_soup(url).find('h1', class_='media-heading long-title')
+        return get_root(url) + title.findAll('a')[1]['href']
+
+    page = get_soup(url)
 
     # Scrape info about politician
-    summary = soup.find('div', class_='media-body')
+    summary = page.find('div', class_='media-body')
     politician_name = sanitised(summary.find('h1').find('span').text)
     # todo: find regex that does preserves O'Bryan and Foo-Zoo but not O', 'O, Foo- or -Foo
     politicians_data['Name'].append(politician_name)
@@ -159,32 +164,40 @@ def scrape_politician_info(url: str, politicians_data: defaultdict, voting_histo
     politicians_data['Role'].append(sanitised(summary.find('span', class_='title').text))
     politicians_data['Electorate'].append(sanitised(summary.find('span', class_='electorate').text))
     try:
-        rebellion = summary.find('span', class_='member-rebellions').text
-        if 'never' not in rebellion.lower():
-            rebellion = re.search(r'\d+\.?\d*', rebellion)[0]
-            rebellion = float(rebellion) / 100
+        rebellion_rate = summary.find('span', class_='member-rebellions').text
+        if 'never' not in rebellion_rate.lower():
+            rebellion_rate = re.search(r'\d+\.?\d*', rebellion_rate)[0]
+            rebellion_rate = float(rebellion_rate) / 100
         else:
-            rebellion = 0.
-        politicians_data['Rebellion'].append(rebellion)
+            rebellion_rate = 0.
+        politicians_data['Rebellion'].append(rebellion_rate)
 
-        attendance = summary.find('span', class_='member-attendance').text
-        attendance = re.search(r'\d+\.?\d*', attendance)[0]
-        attendance = float(attendance) / 100
-        politicians_data['Attendance'].append(attendance)
+        attendance_rate = summary.find('span', class_='member-attendance').text
+        attendance_rate = re.search(r'\d+\.?\d*', attendance_rate)[0]
+        attendance_rate = float(attendance_rate) / 100
+        politicians_data['Attendance'].append(attendance_rate)
     except AttributeError:
         politicians_data['Rebellion'].append('')
         politicians_data['Attendance'].append(np.nan)
 
     # Scrape info about policy
     for type_ in VoteType:
-        section = soup.find('div', class_=type_.value)
+        section = page.find('div', class_=type_.value)
         if section:
             list_ = section.find('ul')
             for item in list_.findAll('li'):
                 voting_history_data['Politician'].append(sanitised(politician_name))
                 voting_history_data['Type'].append(type_.name)
                 voting_history_data['Policy'].append(sanitised(item.text))
-                voting_history_data['URL'].append(get_root(url) + item.a['href'])
+
+                root_url = get_root(url)
+                sub_url = item.a['href']
+                if shortcut:
+                    # todo: check if full policy url always == get_root(url) + last two suffix of item.a['href']
+                    policy_url = root_url + re.search(r'.*(/policies/\d+)\n?$', sub_url)[1]
+                else:
+                    policy_url = scrape_policy_url_from_intermediary(root_url + sub_url)
+                voting_history_data['URL'].append(policy_url)
 
     # Scrape info about politician's friends
     page = get_soup(url + '/friends')
@@ -200,14 +213,14 @@ def scrape_politician_info(url: str, politicians_data: defaultdict, voting_histo
             matrix[other_name][politician_name] = agreement
 
 
-def scrape_australian_parliament_members() -> Tuple[pd.DataFrame, pd.DataFrame, defaultdict]:
+def scrape_australian_parliament_members(shortcut=False) -> Tuple[pd.DataFrame, pd.DataFrame, defaultdict]:
     logging.info('Starting to scrape politicians from TheyVoteForYou')
 
     # Scrape url of all parliament members
     seed_url = 'https://theyvoteforyou.org.au/people'
     hostname = get_root(seed_url)
-    soup = get_soup(seed_url)
-    list_ = soup.find('div', class_='container main-content').find('ol')
+    page = get_soup(seed_url)
+    list_ = page.find('div', class_='container main-content').find('ol')
     to_visit = []
     for item in list_.findAll('li', recursive=False):
         to_visit.append(hostname + item.find('a')['href'])
@@ -223,7 +236,7 @@ def scrape_australian_parliament_members() -> Tuple[pd.DataFrame, pd.DataFrame, 
             continue
         visited.add(url)
 
-        scrape_politician_info(url, politicians_data, voting_history_data, friendship_matrix)
+        scrape_politician_info(url, politicians_data, voting_history_data, friendship_matrix, shortcut=True)
     df_politicians = pd.DataFrame.from_dict(politicians_data)
     df_voting_history = pd.DataFrame.from_dict(voting_history_data)
 
@@ -233,8 +246,8 @@ def scrape_australian_parliament_members() -> Tuple[pd.DataFrame, pd.DataFrame, 
 def scrape_policies(urls: List[str]) -> pd.DataFrame:
     data = {'Name': [], 'Description': [], 'URL': []}
     for url in urls:
-        soup = get_soup(url)
-        header = soup.find('div', class_='page-header')
+        page = get_soup(url)
+        header = page.find('div', class_='page-header')
         data['Name'].append(sanitised(header.find('h1', class_='long-title').text))
         data['Description'].append(sanitised(header.find('div', class_='policytext').text))
         data['URL'].append(url)
@@ -269,12 +282,17 @@ if __name__ == '__main__':
     # df = pd.DataFrame.from_dict(politicans_data)
     # df.to_csv('data/australian_and_state_parliament_members.csv', index=False)
 
-    df_politicians, df_voting_history, friendship_matrix = scrape_australian_parliament_members()
+    # Scrape info about politicians, their policy voting history and friends
+    df_politicians, df_voting_history, friendship_matrix = scrape_australian_parliament_members(shortcut=False)
 
     df_politicians.to_csv('data/au_parliament_members_data.csv', index=False)
     df_voting_history.to_csv('data/au_parliament_policies_voting_data.csv', index=False)
     with open('data/friendship_matrix.joblib', 'wb') as f:
         dump(friendship_matrix, f)
 
+    # Scrape info about policies
+    df_voting_history = pd.read_csv('data/au_parliament_policies_voting_data.csv')
     df_policies = scrape_policies(df_voting_history['URL'].tolist())
     df_policies.to_csv('data/policies.csv', index=False)
+
+
