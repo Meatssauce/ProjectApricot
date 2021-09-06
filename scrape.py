@@ -294,5 +294,3 @@ if __name__ == '__main__':
     df_voting_history = pd.read_csv('data/au_parliament_policies_voting_data.csv')
     df_policies = scrape_policies(df_voting_history['URL'].tolist())
     df_policies.to_csv('data/policies.csv', index=False)
-
-
