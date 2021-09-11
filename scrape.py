@@ -277,7 +277,8 @@ def find_party_stakes():
 # Tests
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    # post_codes = get_postcodes()
+
+    # Scrape all parliament members
     # politicans_data = scrape_all_parliment_members()
     # df = pd.DataFrame.from_dict(politicans_data)
     # df.to_csv('data/australian_and_state_parliament_members.csv', index=False)
@@ -291,6 +292,6 @@ if __name__ == '__main__':
         dump(friendship_matrix, f)
 
     # Scrape info about policies
-    df_voting_history = pd.read_csv('data/au_parliament_policies_voting_data.csv')
-    df_policies = scrape_policies(df_voting_history['URL'].tolist())
-    df_policies.to_csv('data/policies.csv', index=False)
+    # df_voting_history = pd.read_csv('data/au_parliament_policies_voting_data.csv')
+    # df_policies = scrape_policies(df_voting_history['URL'].tolist())
+    # df_policies.to_csv('data/policies.csv', index=False)
