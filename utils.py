@@ -4,6 +4,7 @@ from enum import Enum
 
 
 class VoteType(Enum):
+    # html class for each vote type on theyvoteforyou.org
     VeryStronglyFor = 'position-voted-very-strongly-for'
     StronglyFor = 'position-voted-strongly-for'
     ModeratelyFor = 'position-voted-moderately-for'
