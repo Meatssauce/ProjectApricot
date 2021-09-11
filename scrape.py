@@ -38,7 +38,7 @@ def get_root(url: str) -> str:
 
 
 # Remove commas and quotation marks from string
-def sanitised(string: str) -> str:
+def cleaned(string: str) -> str:
     string = re.sub(r'\W', ' ', string)  # remove symbols and extra white space
     return re.sub(r'(^\s+|\s+$)', '', string)  # remove white space at beginning and end
 
@@ -92,7 +92,7 @@ def scrape_all_parliment_members() -> dict:
                 member = ' '.join(reversed(member.split(', ')))
             else:
                 member = elements[0].text
-            member = sanitised(member)
+            member = cleaned(member)
             member = re.sub(r'\s*(\[.*\]|\d)$', '', member)
             member = re.sub(r'^(Hon|Dr|Hon Dr)\s*', '', member)
             members.append(member)
@@ -157,12 +157,12 @@ def scrape_politician_info(url: str, politicians_data: defaultdict, voting_histo
 
     # Scrape info about politician
     summary = page.find('div', class_='media-body')
-    politician_name = sanitised(summary.find('h1').find('span').text)
+    politician_name = cleaned(summary.find('h1').find('span').text)
     # todo: find regex that does preserves O'Bryan and Foo-Zoo but not O', 'O, Foo- or -Foo
     politicians_data['Name'].append(politician_name)
-    politicians_data['Party'].append(sanitised(summary.find('span', class_='org').text))
-    politicians_data['Role'].append(sanitised(summary.find('span', class_='title').text))
-    politicians_data['Electorate'].append(sanitised(summary.find('span', class_='electorate').text))
+    politicians_data['Party'].append(cleaned(summary.find('span', class_='org').text))
+    politicians_data['Role'].append(cleaned(summary.find('span', class_='title').text))
+    politicians_data['Electorate'].append(cleaned(summary.find('span', class_='electorate').text))
     try:
         rebellion_rate = summary.find('span', class_='member-rebellions').text
         if 'never' not in rebellion_rate.lower():
@@ -186,9 +186,9 @@ def scrape_politician_info(url: str, politicians_data: defaultdict, voting_histo
         if section:
             list_ = section.find('ul')
             for item in list_.findAll('li'):
-                voting_history_data['Politician'].append(sanitised(politician_name))
+                voting_history_data['Politician'].append(cleaned(politician_name))
                 voting_history_data['Type'].append(type_.name)
-                voting_history_data['Policy'].append(sanitised(item.text))
+                voting_history_data['Policy'].append(cleaned(item.text))
 
                 root_url = get_root(url)
                 sub_url = item.a['href']
@@ -204,7 +204,7 @@ def scrape_politician_info(url: str, politicians_data: defaultdict, voting_histo
     table = page.find('table')
     for row in table.findAll('tr')[1:]:
         cells = row.findAll('td')
-        other_name = sanitised(cells[1].text)
+        other_name = cleaned(cells[1].text)
 
         if politician_name not in matrix or other_name not in matrix:
             agreement = re.match(r'\d+\.?\d*', cells[0].text)[0]
@@ -248,8 +248,8 @@ def scrape_policies(urls: List[str]) -> pd.DataFrame:
     for url in urls:
         page = get_soup(url)
         header = page.find('div', class_='page-header')
-        data['Name'].append(sanitised(header.find('h1', class_='long-title').text))
-        data['Description'].append(sanitised(header.find('div', class_='policytext').text))
+        data['Name'].append(cleaned(header.find('h1', class_='long-title').text))
+        data['Description'].append(cleaned(header.find('div', class_='policytext').text))
         data['URL'].append(url)
     return pd.DataFrame.from_dict(data)
 
