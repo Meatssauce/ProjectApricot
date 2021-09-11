@@ -36,6 +36,4 @@ for i, (url, name) in enumerate(zip(tqdm(search_urls), df['Name'].values)):
 df['Facebook'] = facebook_urls
 df['Twitter'] = twitter_urls
 df['Error'] = error
-with open('save', 'wb') as f:
-    dump(df, f)
 df.to_csv('data/au_parliament_members_data.csv', index=False)
