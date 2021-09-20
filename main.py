@@ -21,7 +21,7 @@
 # in addition: economic spectrum (horizontal)
 # determined based on specific voting history (economic policies)
 
-# some sources for structured data
+# some sources for structured dataset
 # https://www.aph.gov.au/Senators_and_Members/
 # https://www.openaustralia.org.au/
 # https://theyvoteforyou.org.au/

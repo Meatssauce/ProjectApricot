@@ -7,7 +7,7 @@ from facebook_scraper import get_posts
 # Parameters
 max_tweets = 100
 
-# Load politician data
+# Load politician dataset
 df = pd.read_csv('data/au_parliament_members_data.csv')
 
 # Scrape tweets
@@ -24,4 +24,4 @@ for handle in tqdm(twitter_handles.values):
 # for url in tqdm(facebook_urls.values):
 #     if url is not np.nan:
 #         os.system(f"snscrape --jsonl --max-results {max_tweets} --since 2010-01-01 twitter-search 'from:{handle}' "
-#                   f"> data/tweets/{handle}.json")
+#                   f"> dataset/tweets/{handle}.json")
