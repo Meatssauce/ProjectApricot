@@ -204,13 +204,12 @@ def scrape_politician_info(url: str, politicians_data: defaultdict, voting_histo
     table = page.find('table')
     for row in table.findAll('tr')[1:]:
         cells = row.findAll('td')
-        other_name = cleaned(cells[1].text)
+        friend_name = cleaned(cells[1].text)
+        agreement = re.match(r'\d+\.?\d*', cells[0].text)[0]
+        agreement = float(agreement) / 100
 
-        if politician_name not in matrix or other_name not in matrix:
-            agreement = re.match(r'\d+\.?\d*', cells[0].text)[0]
-            agreement = float(agreement) / 100
-            matrix[politician_name][other_name] = agreement
-            matrix[other_name][politician_name] = agreement
+        matrix[politician_name][friend_name] = agreement
+        matrix[friend_name][politician_name] = agreement
 
 
 def scrape_australian_parliament_members(shortcut=False) -> Tuple[pd.DataFrame, pd.DataFrame, defaultdict]:
