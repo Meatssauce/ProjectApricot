@@ -15,7 +15,7 @@ twitter_handles = df['Twitter'].str.extract(r'^.+/(\w+)$')[0]
 for handle in tqdm(twitter_handles.values):
     if handle is not np.nan:
         os.system(f"snscrape --jsonl --max-results {max_tweets} --since 2010-01-01 twitter-search 'from:{handle}' "
-                  f"> data/tweets/{handle}.json")
+                  f"> datapo/tweets/{handle}.json")
 
 # user_handle = 'SenatorRennick'
 
