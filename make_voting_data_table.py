@@ -29,6 +29,7 @@ voting_records['Party'] = df.loc[[name for name in voting_records.index], 'Party
 
 # Create scatter plot for reduced dimensions
 sns.scatterplot(data=voting_records, x='Component 1', y='Component 2', hue='Party')
+plt.show()
 
 # Create pairplot of all the variables with hue set to class
 # sns.pairplot(voting_records.iloc[:, 0:5])
