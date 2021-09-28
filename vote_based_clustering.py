@@ -5,13 +5,16 @@ from joblib import load, dump
 from category_encoders import OrdinalEncoder
 import seaborn as sns
 from sklearn.decomposition import PCA, SparsePCA
+from os import makedirs
+
+makedirs('plots', exist_ok=True)
 
 #
 # Cluster plot of politicians
 #
 
 # Produce vote-based embeddings for politicians from policy voting records
-df = pd.read_csv('dataset/au_parliament_policies_voting_data.csv')
+df = pd.read_csv('datasets/parliament-policies-voting-records.csv')
 voting_records = df.drop('Policy', axis=1).pivot(index='Politician', columns='URL')
 
 # Encode vote type as ordinal variables
@@ -23,7 +26,7 @@ encoder = OrdinalEncoder(return_df=True, mapping=mapping)
 voting_records = encoder.fit_transform(voting_records)
 
 # Get party of each politician and pick Liberals' voting records
-df = pd.read_csv('dataset/au_parliament_members_data.csv', index_col='Name')
+df = pd.read_csv('datasets/parliament-members.csv', index_col='Name')
 parties = df.loc[[name for name in voting_records.index], 'Party']
 # voting_records = voting_records[parties == 'Liberal Party']
 top_parties = parties.value_counts().index[:4]
@@ -39,9 +42,17 @@ voting_records = pd.DataFrame(pca.fit_transform(voting_records), index=voting_re
                               columns=['Component 1', 'Component 2'])  # liberal vs labor and right vs left?
 voting_records *= -1  # for cosmetic purposes
 
-# Create scatter plot for reduced dimensions
+# Create simple scatter plot with data point labels
 # sns.scatterplot(data=voting_records, x='Component 1', y='Component 2', hue=stances)
-# sns.scatterplot(data=voting_records, x='Component 1', y='Component 2')
+sns.scatterplot(data=voting_records, x='Component 1', y='Component 2')
+prominent_politicians = ['Scott Morrison', 'Simon Birmingham', 'Peter Dutton', 'Linda Burney', 'Rachel Siewert']
+for name in prominent_politicians:
+    if name in voting_records.index:
+        plt.text(voting_records.loc[name, 'Component 1'], voting_records.loc[name, 'Component 2'], name)
+plt.savefig('plots/vote-based-scatter-plot-simple.png')
+plt.close()
+
+# Create join scatter plot
 sns.jointplot(
     data=voting_records,
     x='Component 1',
@@ -49,11 +60,8 @@ sns.jointplot(
     hue=parties,
     kind='scatter'  # or 'kde' or 'hex'
 )
-prominent_politicians = ['Scott Morrison', 'Simon Birmingham', 'Peter Dutton', 'Linda Burney', 'Rachel Siewert']
-for name in prominent_politicians:
-    if name in voting_records.index:
-        plt.text(voting_records.loc[name, 'Component 1'], voting_records.loc[name, 'Component 2'], name)
-plt.show()
+plt.savefig('plots/vote-based-scatter-plot-joint.png')
+plt.close()
 
 # =========================================
 
@@ -62,7 +70,7 @@ plt.show()
 #
 
 # Produce voter-based embeddings for policies from policy voting records
-df = pd.read_csv('dataset/au_parliament_policies_voting_data.csv')
+df = pd.read_csv('datasets/parliament-policies-voting-records.csv')
 voting_records = df.drop('URL', axis=1).pivot(index='Policy', columns='Politician')
 
 # Encode vote type as ordinal variables
@@ -74,7 +82,7 @@ encoder = OrdinalEncoder(return_df=True, mapping=mapping)
 voting_records = encoder.fit_transform(voting_records)
 
 # Get party of each politician and pick Liberals' voting records
-# df = pd.read_csv('dataset/au_parliament_members_data.csv', index_col='Name')
+# df = pd.read_csv('datasets/parliament-members.csv', index_col='Name')
 # parties = df.loc[[name for name in voting_records.index], 'Party']
 # # voting_records = voting_records[parties == 'Liberal Party']
 # top_parties = parties.value_counts().index[:4]
@@ -92,5 +100,5 @@ prominent_policies = voting_records.index[20:30]
 for name in prominent_policies:
     if name in voting_records.index:
         plt.text(voting_records.loc[name, 'Component 1'], voting_records.loc[name, 'Component 2'], name)
-
-plt.show()
+plt.savefig('plots/voter-based-scatter-plot-for-policies.png')
+plt.close()
