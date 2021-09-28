@@ -9,7 +9,7 @@ from tqdm import tqdm
 from scrape import get_soup, cleaned
 
 # Load politician info
-df = pd.read_csv('data/au_parliament_members_data.csv')
+df = pd.read_csv('dataset/au_parliament_members_data.csv')
 
 # Find url to search result for each politician
 search_urls = df['Name'].str.replace(r'\s+', '+', regex=True)
@@ -27,13 +27,15 @@ for i, (url, name) in enumerate(zip(tqdm(search_urls), df['Name'].values)):
         if name not in cleaned(top_result.find('h4', class_='title').text):
             raise AttributeError()
         if facebook := top_result.find('a', class_='social facebook'):
-            facebook_urls[i] = facebook['href']
+            facebook_urls[i] = re.sub(r'(^\s+|\s+$)', '', facebook['href'])
         if twitter := top_result.find('a', class_='social twitter margin-right'):
-            twitter_urls[i] = twitter['href']
+            twitter_urls[i] = re.sub(r'(^\s+|\s+$)', '', twitter['href'])
     except AttributeError:
         error[i] = True
 
 df['Facebook'] = facebook_urls
 df['Twitter'] = twitter_urls
 df['Error'] = error
+df['Facebook Handle'] = df['Facebook'].str.extract(r'^.+/\s?(\w+)$')[0]
+df['Twitter Handle'] = df['Twitter'].str.extract(r'^.+/\s?(\w+)$')[0]
 df.to_csv('dataset/au_parliament_members_data.csv', index=False)
