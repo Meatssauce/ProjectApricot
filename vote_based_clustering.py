@@ -29,8 +29,9 @@ parties = df.loc[[name for name in voting_records.index], 'Party']
 top_parties = parties.value_counts().index[:4]
 parties.loc[~parties.isin(top_parties)] = "Other"
 
-# Hue vector for stance on key issues
-stances = np.where(voting_records['Type', 'https://theyvoteforyou.org.au/policies/44'] > 3, 1, 0)
+# # Uncomment this block to show mark left vs right or authoritarian vs libertarian politicians
+# # Hue vector for stance on key issues
+# stances = np.where(voting_records['Type', 'https://theyvoteforyou.org.au/policies/44'] > 3, 1, 0)
 
 # Reduce to two dimensions
 pca = PCA(2)
