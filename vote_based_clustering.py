@@ -9,6 +9,8 @@ from sklearn.decomposition import PCA, SparsePCA
 #
 # Cluster plot of politicians
 #
+
+# Produce vote-based embeddings for politicians from policy voting records
 df = pd.read_csv('dataset/au_parliament_policies_voting_data.csv')
 voting_records = df.drop('Policy', axis=1).pivot(index='Politician', columns='URL')
 
@@ -34,7 +36,7 @@ stances = np.where(voting_records['Type', 'https://theyvoteforyou.org.au/policie
 pca = PCA(2)
 voting_records = pd.DataFrame(pca.fit_transform(voting_records), index=voting_records.index,
                               columns=['Component 1', 'Component 2'])  # liberal vs labor and right vs left?
-voting_records *= -1
+voting_records *= -1  # for cosmetic purposes
 
 # Create scatter plot for reduced dimensions
 # sns.scatterplot(data=voting_records, x='Component 1', y='Component 2', hue=stances)
@@ -57,6 +59,8 @@ plt.show()
 #
 # Cluster plot of policies
 #
+
+# Produce voter-based embeddings for policies from policy voting records
 df = pd.read_csv('dataset/au_parliament_policies_voting_data.csv')
 voting_records = df.drop('URL', axis=1).pivot(index='Policy', columns='Politician')
 
