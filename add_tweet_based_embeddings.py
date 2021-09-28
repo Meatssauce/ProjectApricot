@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer
 
 # Load model and data
 model = SentenceTransformer('all-mpnet-base-v2')  # SOTA for sentence embedding according to official docs
-politicians = pd.read_csv('dataset/au_parliament_members_data.csv', index_col='Name')
+politicians = pd.read_csv('datasets/parliament-members.csv', index_col='Name')
 
 # Compute tweet-based semantic embedding for each politician indexed by politician name
 politician_embeddings = []
@@ -18,7 +18,7 @@ for handle in tqdm(politicians['Twitter Handle']):
     else:
         # Load tweets by the politician
         tweets_data = []
-        with open(f'dataset/tweets/{handle}.json', 'r') as f:
+        with open(f'datasets/tweets/{handle}.json', 'r') as f:
             for line in f:
                 tweets_data.append(json.loads(line))
 
@@ -37,4 +37,4 @@ for handle in tqdm(politicians['Twitter Handle']):
 politician_embeddings = pd.DataFrame(politician_embeddings, index=politicians.index)
 
 # Save embeddings
-politician_embeddings.to_csv('dataset/tweet_based_embeddings.csv')
+politician_embeddings.to_csv('datasets/tweet-based-embeddings.csv')

@@ -1,6 +1,6 @@
 from joblib import load, dump
 
-with open('data/friendship_matrix.joblib', 'rb') as f:
+with open('data/friendship-matrix.joblib', 'rb') as f:
     matrix = load(f)
 
 # Verify the integrity of friendship_matrix

@@ -87,7 +87,7 @@ def scrape_all_parliment_members() -> dict:
             elements = row.findAll('td')
             sort_value = elements[0].find('span')
             if sort_value:
-                member = elements[0].find('span')['dataset-sort-value']
+                member = elements[0].find('span')['datasets-sort-value']
                 member = re.match(r'^(([a-zA-Z\'-]*,*\s*)?[a-zA-z\'-]+)', member)[0]
                 member = ' '.join(reversed(member.split(', ')))
             else:
@@ -280,17 +280,17 @@ if __name__ == '__main__':
     # Scrape all parliament members
     # politicans_data = scrape_all_parliment_members()
     # df = pd.DataFrame.from_dict(politicans_data)
-    # df.to_csv('dataset/australian_and_state_parliament_members.csv', index=False)
+    # df.to_csv('datasets/australian_and_state_parliament_members.csv', index=False)
 
     # Scrape info about politicians, their policy voting history and friends
     df_politicians, df_voting_history, friendship_matrix = scrape_australian_parliament_members(shortcut=False)
 
-    df_politicians.to_csv('dataset/au_parliament_members_data.csv', index=False)
-    df_voting_history.to_csv('dataset/au_parliament_policies_voting_data.csv', index=False)
-    with open('data/friendship_matrix.joblib', 'wb') as f:
+    df_politicians.to_csv('datasets/parliament-members.csv', index=False)
+    df_voting_history.to_csv('datasets/parliament-policies-voting-records.csv', index=False)
+    with open('data/friendship-matrix.joblib', 'wb') as f:
         dump(friendship_matrix, f)
 
     # Scrape info about policies
-    # df_voting_history = pd.read_csv('dataset/au_parliament_policies_voting_data.csv')
+    # df_voting_history = pd.read_csv('datasets/parliament-policies-voting-records.csv')
     # df_policies = scrape_policies(df_voting_history['URL'].tolist())
-    # df_policies.to_csv('dataset/policies.csv', index=False)
+    # df_policies.to_csv('datasets/policies.csv', index=False)

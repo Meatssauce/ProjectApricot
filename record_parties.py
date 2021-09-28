@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from utils import Politician, Party
 
-df = pd.read_csv('data/au_parliament_members_data.csv')
+df = pd.read_csv('data/parliament-members.csv')
 
 all_parties = set()
 for party_name in df['Party'].unique():
