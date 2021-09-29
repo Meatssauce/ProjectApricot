@@ -108,4 +108,5 @@ clustered = data.loc[data['labels'] != -1, :]
 plt.scatter(outliers['x'], outliers['y'], color='#BDBDBD', s=0.05)
 plt.scatter(clustered['x'], clustered['y'], c=clustered['labels'], s=0.05, cmap='hsv_r')
 plt.colorbar()
-plt.show()
+plt.savefig('plots/tweet-based-topic-modeling.png')
+plt.close()
