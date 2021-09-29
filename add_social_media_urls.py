@@ -1,11 +1,7 @@
 import pandas as pd
 import numpy as np
-import requests
 import re
-
-from joblib import dump
 from tqdm import tqdm
-
 from scrape import get_soup, cleaned
 
 # Load politician info
