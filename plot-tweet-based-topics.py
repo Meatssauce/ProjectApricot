@@ -36,7 +36,7 @@ def make_scatter_plots(data, x, y, hue, kind, remark=''):
 makedirs('plots', exist_ok=True)
 
 # #
-# # Cluster plot of politicians based on their tweets
+# # Scatter plot of politicians based on their tweets
 # #
 #
 # # Load data and use name as index
@@ -84,7 +84,7 @@ makedirs('plots', exist_ok=True)
 # ==========================================
 
 #
-# Cluster plot of tweets - topic modeling
+# Scatter plot of tweets - topic modeling
 #
 
 # Load data and use name as index

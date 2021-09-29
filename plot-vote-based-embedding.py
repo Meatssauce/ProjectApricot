@@ -10,7 +10,7 @@ from os import makedirs
 makedirs('plots', exist_ok=True)
 
 #
-# Cluster plot of politicians
+# Scatter plot of politicians
 #
 
 # Produce vote-based embeddings for politicians from policy voting records
@@ -66,7 +66,7 @@ plt.close()
 # =========================================
 
 #
-# Cluster plot of policies
+# Scatter plot of policies
 #
 
 # Produce voter-based embeddings for policies from policy voting records
