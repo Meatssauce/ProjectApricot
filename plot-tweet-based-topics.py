@@ -35,51 +35,51 @@ def make_scatter_plots(data, x, y, hue, kind, remark=''):
 
 makedirs('plots', exist_ok=True)
 
-# #
-# # Scatter plot of politicians based on their tweets
-# #
 #
-# # Load data and use name as index
-# politicians = pd.read_csv('datasets/parliament-members.csv', index_col='Name')
-# embeddings = pd.read_csv('datasets/tweet-based-embeddings.csv', index_col='Name')
-# # politicians = pd.concat([politicians, embeddings], axis=1)
+# Scatter plot of politicians based on their tweets
 #
-# # Keep only politicians with a tweet-based embedding
-# politicians = politicians[~embeddings.iloc[:, 0].isna()]
-# embeddings = embeddings[~embeddings.iloc[:, 0].isna()]
-#
-# # Replace niche parties with 'Other'
-# # voting_records = voting_records[politicians['Party'] == 'Liberal Party']
-# top_parties = politicians['Party'].value_counts().index[:4]
-# politicians['Party'].loc[~politicians['Party'].isin(top_parties)] = "Other"
-#
-# # Reduce to two dimensions with PCA
-# pca = PCA(2)
-# lower_embeddings = pd.DataFrame(pca.fit_transform(embeddings), index=embeddings.index,
-#                                 columns=['Component 1', 'Component 2'])
-# data = pd.concat([politicians, lower_embeddings], axis=1)
-#
-# make_scatter_plots(data=data,
-#                    x='Component 1',
-#                    y='Component 2',
-#                    hue='Party',
-#                    kind='scatter',  # or 'kde' or 'hex'
-#                    remark='pca'
-#                    )
-#
-# # Reduce to two dimensions with UMAP
-# umap = UMAP(n_neighbors=15, n_components=2, min_dist=0.0, metric='cosine')
-# lower_embeddings = pd.DataFrame(umap.fit_transform(embeddings), index=embeddings.index,
-#                                 columns=['Component 1', 'Component 2'])
-# data = pd.concat([politicians, lower_embeddings], axis=1)
-#
-# make_scatter_plots(data=data,
-#                    x='Component 1',
-#                    y='Component 2',
-#                    hue='Party',
-#                    kind='scatter',  # or 'kde' or 'hex'
-#                    remark='umap'
-#                    )
+
+# Load data and use name as index
+politicians = pd.read_csv('datasets/parliament-members.csv', index_col='Name')
+embeddings = pd.read_csv('datasets/tweet-based-embeddings.csv', index_col='Name')
+# politicians = pd.concat([politicians, embeddings], axis=1)
+
+# Keep only politicians with a tweet-based embedding
+politicians = politicians[~embeddings.iloc[:, 0].isna()]
+embeddings = embeddings[~embeddings.iloc[:, 0].isna()]
+
+# Replace niche parties with 'Other'
+# voting_records = voting_records[politicians['Party'] == 'Liberal Party']
+top_parties = politicians['Party'].value_counts().index[:4]
+politicians['Party'].loc[~politicians['Party'].isin(top_parties)] = "Other"
+
+# Reduce to two dimensions with PCA
+pca = PCA(2)
+lower_embeddings = pd.DataFrame(pca.fit_transform(embeddings), index=embeddings.index,
+                                columns=['Component 1', 'Component 2'])
+data = pd.concat([politicians, lower_embeddings], axis=1)
+
+make_scatter_plots(data=data,
+                   x='Component 1',
+                   y='Component 2',
+                   hue='Party',
+                   kind='scatter',  # or 'kde' or 'hex'
+                   remark='pca'
+                   )
+
+# Reduce to two dimensions with UMAP
+umap = UMAP(n_neighbors=15, n_components=2, min_dist=0.0, metric='cosine')
+lower_embeddings = pd.DataFrame(umap.fit_transform(embeddings), index=embeddings.index,
+                                columns=['Component 1', 'Component 2'])
+data = pd.concat([politicians, lower_embeddings], axis=1)
+
+make_scatter_plots(data=data,
+                   x='Component 1',
+                   y='Component 2',
+                   hue='Party',
+                   kind='scatter',  # or 'kde' or 'hex'
+                   remark='umap'
+                   )
 
 # ==========================================
 
