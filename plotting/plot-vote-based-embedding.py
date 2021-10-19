@@ -31,7 +31,7 @@ def make_vote_based_scatter_plot(data, x, y, hue, kind, remark=''):
     for name in politicians_of_interest:
         if name in data.index:
             plt.text(data.loc[name, x], data.loc[name, y], name)
-    plt.savefig(f'plots/vote-based-scatter-plot-simple{remark}.png')
+    plt.savefig(f'../plots/vote-based-scatter-plot-simple{remark}.png')
     plt.close()
 
     # Create join scatter plot
@@ -42,7 +42,7 @@ def make_vote_based_scatter_plot(data, x, y, hue, kind, remark=''):
         hue=hue,
         kind=kind  # or 'kde' or 'hex'
     )
-    plt.savefig(f'plots/vote-based-scatter-plot-joint{remark}.png')
+    plt.savefig(f'../plots/vote-based-scatter-plot-joint{remark}.png')
     plt.close()
 
 
@@ -56,18 +56,18 @@ def make_voter_based_scatter_plot(data, x, y, remark=''):
     for i in policies_of_interest:
         if i in data.index:
             plt.text(data.loc[i, x], data.loc[i, y], i)
-    plt.savefig(f'plots/voter-based-scatter-plot-for-policies{remark}.png')
+    plt.savefig(f'../plots/voter-based-scatter-plot-for-policies{remark}.png')
     plt.close()
 
 
-makedirs('plots', exist_ok=True)
+makedirs('../plots', exist_ok=True)
 
 #
 # Scatter plot of politicians
 #
 
 # Produce vote-based embeddings for politicians from policy voting records
-df = pd.read_csv('datasets/parliament-policies-voting-records.csv')
+df = pd.read_csv('../datasets/parliament-policies-voting-records.csv')
 voting_records = df.drop('Policy', axis=1).pivot(index='Politician', columns='URL')
 
 # Encode vote type as ordinal variables
@@ -79,7 +79,7 @@ encoder = OrdinalEncoder(return_df=True, mapping=mapping)
 voting_records = encoder.fit_transform(voting_records)
 
 # Get party of each politician and pick Liberals' voting records
-df = pd.read_csv('datasets/parliament-members.csv', index_col='Name')
+df = pd.read_csv('../datasets/parliament-members.csv', index_col='Name')
 parties = df.loc[[name for name in voting_records.index], 'Party']
 # voting_records = voting_records[parties == 'Liberal Party']
 top_parties = parties.value_counts().index[:4]
@@ -116,7 +116,7 @@ make_vote_based_scatter_plot(data=voting_records_2d, x='Component 1', y='Compone
 #
 
 # Produce voter-based embeddings for policies from policy voting records
-df = pd.read_csv('datasets/parliament-policies-voting-records.csv')
+df = pd.read_csv('../datasets/parliament-policies-voting-records.csv')
 voting_records = df.drop('URL', axis=1).pivot(index='Policy', columns='Politician')
 
 # Encode vote type as ordinal variables
@@ -128,7 +128,7 @@ encoder = OrdinalEncoder(return_df=True, mapping=mapping)
 voting_records = encoder.fit_transform(voting_records)
 
 # Get party of each politician and pick Liberals' voting records
-# df = pd.read_csv('datasets/parliament-members.csv', index_col='Name')
+# df = pd.read_csv('../datasets/parliament-members.csv', index_col='Name')
 # parties = df.loc[[name for name in voting_records.index], 'Party']
 # # voting_records = voting_records[parties == 'Liberal Party']
 # top_parties = parties.value_counts().index[:4]

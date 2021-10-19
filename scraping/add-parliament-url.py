@@ -3,7 +3,7 @@ import numpy as np
 
 
 # Load datasets about politicians
-df = pd.read_csv('data/parliament-members.csv')
+df = pd.read_csv('../datasets/parliament-members.csv')
 
 # Make suburl for www.aph.gov.au for each politician
 mp = df['Role'].str.lower().str.contains('representative')
@@ -19,7 +19,7 @@ df['Parliament url'] = np.where(mp & ~senator, first_name_prefix + '_' + last_na
 df['Parliament url'] = np.where(senator & ~mp, 'Senator_' + last_name, df['Parliament url'])
 df['Parliament url'] = 'https://www.aph.gov.au/' + df['Parliament url']
 
-df.to_csv('datasets/parliament-members.csv')
+df.to_csv('../datasets/parliament-members.csv')
 
 
 

@@ -27,7 +27,7 @@ from tqdm import tqdm
 
 # Any results you write to the current directory are saved as output.
 
-news_feed = pd.read_csv('datasets/news-week-aug24.csv', dtype={'publish_time': object})
+news_feed = pd.read_csv('../datasets/news-week-aug24.csv', dtype={'publish_time': object})
 
 news_feed['publish_hour'] = news_feed.publish_time.str[:10]
 news_feed['publish_date'] = news_feed.publish_time.str[:8]

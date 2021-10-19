@@ -22,8 +22,8 @@ def make_word_cloud(texts):
     cloud.generate(texts)
     cloud.to_image()
     if save_word_cloud:
-        os.makedirs('results', exist_ok=True)
-        cloud.to_file(f'results/word-cloud-{num_topics}.png')
+        os.makedirs('../results', exist_ok=True)
+        cloud.to_file(f'../results/word-cloud-{num_topics}.png')
 
 
 # Parameters
@@ -61,11 +61,11 @@ if __name__ == '__main__':
     nlp.tokenizer.token_match = re.compile(re_token_match).match
 
     # Load all tweets as dataframe
-    politicians = pd.read_csv('datasets/parliament-members.csv', index_col='Name')
+    politicians = pd.read_csv('../datasets/parliament-members.csv', index_col='Name')
     tweets_data = []
     for handle in tqdm(politicians['Twitter Handle'], desc='Loading data'):
         if handle is not np.nan:
-            with open(f'datasets/tweets/{handle}.json', 'r') as f:
+            with open(f'../datasets/tweets/{handle}.json', 'r') as f:
                 for line in f:
                     tweets_data.append(json.loads(line))
     tweets = pd.DataFrame.from_records(tweets_data)
@@ -128,6 +128,6 @@ if __name__ == '__main__':
 
         # Visualize the topics
         print('Visualising topics')
-        os.makedirs('results', exist_ok=True)
+        os.makedirs('../results', exist_ok=True)
         LDAvis_prepared = gensim_models.prepare(lda_model, corpus, id2word)
-        pyLDAvis.save_html(LDAvis_prepared, f'results/ldavis-prepared-{str(num_topics)}.html')
+        pyLDAvis.save_html(LDAvis_prepared, f'../results/ldavis-prepared-{str(num_topics)}.html')

@@ -287,10 +287,10 @@ if __name__ == '__main__':
     #
     # df_politicians.to_csv('datasets/parliament-members.csv', index=False)
     # df_voting_history.to_csv('datasets/parliament-policies-voting-records.csv', index=False)
-    # with open('data/friendship-matrix.joblib', 'wb') as f:
+    # with open('datasets/friendship-matrix.joblib', 'wb') as f:
     #     dump(friendship_matrix, f)
 
     # Scrape info about policies
-    df_voting_history = pd.read_csv('datasets/parliament-policies-voting-records.csv')
+    df_voting_history = pd.read_csv('../datasets/parliament-policies-voting-records.csv')
     df_policies = scrape_policies(df_voting_history['URL'].to_list())
-    df_policies.to_csv('datasets/policies.csv', index=False)
+    df_policies.to_csv('../datasets/policies.csv', index=False)

@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer
 # Load model and data
 # current SOTA: all-mpnet-base-v2(best), all-MiniLM-L6-v2(a lot faster and still good performance)
 model = SentenceTransformer('all-MiniLM-L6-v2')
-politicians = pd.read_csv('datasets/parliament-members.csv', index_col='Name')
+politicians = pd.read_csv('../datasets/parliament-members.csv', index_col='Name')
 
 # Compute tweet-based semantic embedding for each politician indexed by politician name, then semantic embedding of
 # each tweet
@@ -22,7 +22,7 @@ for name, handle in tqdm(zip(politicians.index, politicians['Twitter Handle']), 
     else:
         # Load tweets by the politician
         tweets_data = []
-        with open(f'datasets/tweets/{handle}.json', 'r') as f:
+        with open(f'../datasets/tweets/{handle}.json', 'r') as f:
             for line in f:
                 tweets_data.append(json.loads(line))
 
@@ -49,9 +49,9 @@ tweet_embeddings = pd.concat(tweet_embeddings, axis=0)
 politician_embeddings = pd.DataFrame(politician_embeddings, index=politicians.index)
 
 # Save embeddings
-os.makedirs('datasets', exist_ok=True)
-tweet_embeddings.to_csv('datasets/tweet-embeddings.csv', index=False)
-politician_embeddings.to_csv('datasets/tweet-based-embeddings.csv')
+os.makedirs('../datasets', exist_ok=True)
+tweet_embeddings.to_csv('../datasets/tweet-embeddings.csv', index=False)
+politician_embeddings.to_csv('../datasets/tweet-based-embeddings.csv')
 print(f'error triggers {bad_handles}')
 # error triggers ['joshwilsonmp', 'SteveIronsMP', 'JohnAlexanderMP', 'lidia__thorpe', 'lukejgosling', 'SHendersonMP',
 # 'stephenjonesalp', 'JamesMcGrathLNP']

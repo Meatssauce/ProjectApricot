@@ -18,7 +18,7 @@ def make_scatter_plots(data, x, y, hue, kind, remark=''):
     for name in prominent_politicians:
         if name in data.index:
             plt.text(data.loc[name, x], data.loc[name, y], name)
-    plt.savefig(f'plots/tweet-based-scatter-plot-simple{remark}.png')
+    plt.savefig(f'../plots/tweet-based-scatter-plot-simple{remark}.png')
     plt.close()
 
     # Create join scatter plot
@@ -29,19 +29,19 @@ def make_scatter_plots(data, x, y, hue, kind, remark=''):
         hue=hue,
         kind=kind  # or 'kde' or 'hex'
     )
-    plt.savefig(f'plots/tweet-based-scatter-plot-join{remark}.png')
+    plt.savefig(f'../plots/tweet-based-scatter-plot-join{remark}.png')
     plt.close()
 
 
-makedirs('plots', exist_ok=True)
+makedirs('../plots', exist_ok=True)
 
 #
 # Scatter plot of politicians based on their tweets
 #
 
 # Load data and use name as index
-politicians = pd.read_csv('datasets/parliament-members.csv', index_col='Name')
-embeddings = pd.read_csv('datasets/tweet-based-embeddings.csv', index_col='Name')
+politicians = pd.read_csv('../datasets/parliament-members.csv', index_col='Name')
+embeddings = pd.read_csv('../datasets/tweet-based-embeddings.csv', index_col='Name')
 # politicians = pd.concat([politicians, embeddings], axis=1)
 
 # Keep only politicians with a tweet-based embedding
@@ -88,7 +88,7 @@ make_scatter_plots(data=data,
 #
 
 # Load data and use name as index
-embeddings = pd.read_csv('datasets/tweet-embeddings.csv')
+embeddings = pd.read_csv('../datasets/tweet-embeddings.csv')
 del embeddings['name']
 
 # Reduce to two dimensions with UMAP
@@ -108,5 +108,5 @@ clustered = data.loc[data['labels'] != -1, :]
 plt.scatter(outliers['x'], outliers['y'], color='#BDBDBD', s=0.05)
 plt.scatter(clustered['x'], clustered['y'], c=clustered['labels'], s=0.05, cmap='hsv_r')
 plt.colorbar()
-plt.savefig('plots/tweet-based-topic-modeling.png')
+plt.savefig('../plots/tweet-based-topic-modeling.png')
 plt.close()

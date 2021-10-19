@@ -5,7 +5,7 @@ from tqdm import tqdm
 from scrape import get_soup, cleaned
 
 # Load politician info
-df = pd.read_csv('datasets/parliament-members.csv')
+df = pd.read_csv('../datasets/parliament-members.csv')
 
 # Find url to search result for each politician
 search_urls = df['Name'].str.replace(r'\s+', '+', regex=True)
@@ -34,4 +34,4 @@ df['Twitter'] = twitter_urls
 df['Error'] = error
 df['Facebook Handle'] = df['Facebook'].str.extract(r'^.+/\s?(\w+)$')[0]
 df['Twitter Handle'] = df['Twitter'].str.extract(r'^.+/\s?(\w+)$')[0]
-df.to_csv('datasets/parliament-members.csv', index=False)
+df.to_csv('../datasets/parliament-members.csv', index=False)
