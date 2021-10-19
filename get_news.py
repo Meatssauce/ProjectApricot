@@ -6,8 +6,6 @@ import requests
 import pandas as pd
 
 
-
-
 def get_news(headers: dict, params: dict) -> dict:
     """Search news using newscatcher api. 10,000 calls, 1 API call/second, 1 month old articles"""
     # GET call api with the parameters provided
@@ -56,6 +54,7 @@ class APIError(Exception):
     pass
 
 
+# Driver code
 headers = {
     'x-api-key': "63US199aYQka9-nwR6xNtpH3WIEYAPLRuUijRWOxVwk"
     }
