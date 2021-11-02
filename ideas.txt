@@ -28,3 +28,32 @@ https://theyvoteforyou.org.au/
 
 Structure unclear
 https://parlinfo.aph.gov.au/parlInfo/search/display/display.w3p;db=CHAMBER;id=chamber%2Fhansards%2F395f68fa-06e3-4162-a1b9-1ef89b58cd19%2F0088;query=Id%3A%22chamber%2Fhansards%2F395f68fa-06e3-4162-a1b9-1ef89b58cd19%2F0126%22
+
+
+## New Pipeline proposal
+For each politician:
+    Public speeches >
+    claim detection >
+        train with ??? or MARPOR corpus dataset
+    Disclosure network analysis >
+        manually add the polarity (agreement or rejection of claim), identify the actor (in the case of manifestos,
+        this is always the party), filter the false positives from the automatically identified suggestions, and
+        categorize the remaining claims according to the codebook
+    or claim classification >
+        train with MARPOR corpus dataset
+    claim-based embedding for the individual
+
+    Voting history >
+    vote-based embedding for the individual
+
+# Note
+claim and vote based embeddings should be symmetrical (same structure and format)
+they should maximise amount of info preserved (avoid dimensionality reduction)
+need to define a metric to measure the difference between two embeddings
+    linear vs exponential (many small differences == or > or < few large differences)
+    scale each topic-wise difference by topic popularity
+    5 point scale from theyvoteforyou vs binary scale from MARPOR
+
+
+
+

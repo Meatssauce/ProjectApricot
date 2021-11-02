@@ -40,4 +40,3 @@ class Politician:
     rebellion_rate: float = None
     attendance_rate: float = None
     party: Party = None
-
