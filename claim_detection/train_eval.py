@@ -27,6 +27,7 @@ def compute_metrics(pred):
 
 
 def f1_macro(y_true, y_pred):
+    y_pred = np.argmax(y_pred, axis=1)
     precision, recall, f1, _ = precision_recall_fscore_support(y_true, y_pred, average='macro')
     acc = accuracy_score(y_true, y_pred)
     return {
@@ -54,16 +55,10 @@ def ds_to_tf_ds(dataset: Dataset, shuffle: bool = False, batch_size: int = 32,
     return tf_dataset
 
 
-def main():
-    # Parameters
-    # cached: EleutherAI/gpt-neo-1.3B, EleutherAI/gpt-neo-2.7B, gpt2-medium, gpt2-large, bert-base-cased
-    pretrained_model = "gpt2"
-
+def train_eval(pretrained_model: str):
     # Create folders to store results
     model_dir = os.path.join('fine-tuned-models', pretrained_model.replace('/', '-'))
-    logs_dir = os.path.join(model_dir, 'logs')
     os.makedirs(model_dir, exist_ok=True)
-    os.makedirs(logs_dir, exist_ok=True)
 
     # Load data
     annotated_texts = load_data(('AU', 'CA', 'IE', 'IL', 'NZ', 'SA', 'UK', 'US'))
@@ -73,7 +68,7 @@ def main():
     annotated_texts['label'] = label_encoder.fit_transform(annotated_texts[['label']])
     num_classes = len(annotated_texts['label'].unique())
 
-    with open('label_encoder.joblib', 'wb') as f:
+    with open(os.path.join(model_dir, 'label_encoder.joblib'), 'wb') as f:
         dump(label_encoder, f)
     # todo: save label_encoder or integrate it into a pipeline
 
@@ -130,13 +125,20 @@ def main():
 
     # Load Model and Tokenizer
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model)
-    tokenizer.model_max_length = 256
     model = TFAutoModelForSequenceClassification.from_pretrained(pretrained_model, num_labels=num_classes)
 
+    # Reduce max input token count to save memory at the cost of accuracy
+    tokenizer.model_max_length = 256
+    # default to right padding for model with absolute position embeddings
+    tokenizer.padding_side = "right"
+
     # Add special tokens
-    special_tokens_dict = {'bos_token': '<BOS>', 'eos_token': '<EOS>', 'pad_token': '<PAD>'}
-    num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
+    special_tokens_dict = {'bos_token': '[BOS]', 'eos_token': '[EOS]', 'pad_token': '[PAD]'}
+    tokenizer.add_special_tokens(special_tokens_dict)
     model.resize_token_embeddings(len(tokenizer))
+    # # fix model padding token id
+    # model.config.pad_token_id = tokenizer.pad_token
+    # model.config.eos_token_id = tokenizer.eos_token
 
     # Tokenize data
     train_ds = train_ds.map(lambda x: tokenize(x, tokenizer), batched=True)
@@ -149,7 +151,8 @@ def main():
     val_ds = ds_to_tf_ds(val_ds, batch_size=batch_size, features=tokenizer.model_input_names)
     test_ds = ds_to_tf_ds(test_ds, batch_size=batch_size, features=tokenizer.model_input_names)
 
-    tf.keras.backend.set_floatx('float16')
+    # USe mixed precision to save memory
+    tf.keras.mixed_precision.set_global_policy('mixed_float16')
 
     # Train classifier, evaluate and save results
     model.compile(
@@ -159,18 +162,26 @@ def main():
     )
     model.summary()
 
-    early_stopping = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss', min_delta=0, patience=1, verbose=1,
-        mode='auto', restore_best_weights=True
-    )
-    history = model.fit(train_ds, validation_data=val_ds, epochs=5, callbacks=[early_stopping])
-    model.save_pretrained(model_dir)
+    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=1, verbose=1,
+                                                      restore_best_weights=True)
+    cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath="training_1/cp.ckpt", save_weights_only=True, verbose=1)
+    history = model.fit(train_ds, validation_data=val_ds, epochs=5, callbacks=[early_stopping, cp_callback])
+    model.save(model_dir)
+    # model = tf.keras.models.load_model(os.path.join('fine-tuned-models', 'from-gpu-cloud', 'distilroberta-base',
+    #                                                 'tf_model.h5'))
     scores = model.evaluate(test_ds)
 
-    with open(os.path.join(logs_dir, 'train-history.joblib'), 'wb') as logs_file, \
-            open(os.path.join(logs_dir, 'scores.joblib'), 'wb') as scores_file:
-        dump(history, logs_file)
+    with open(os.path.join(model_dir, 'train-history.joblib'), 'wb') as logs_file, \
+            open(os.path.join(model_dir, 'scores.joblib'), 'wb') as scores_file:
         dump(scores, scores_file)
+        dump(history.histroy, logs_file)
+
+
+def main():
+    # cached: EleutherAI/gpt-neo-1.3B, EleutherAI/gpt-neo-2.7B, gpt2-medium, gpt2-large, bert-base-cased
+    pretrained_models = ['roberta-base', 'bert-base']
+    for model in pretrained_models:
+        train_eval(model)
 
 
 if __name__ == '__main__':
