@@ -4,7 +4,6 @@ import warnings
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
-from facebook_scraper import get_posts
 import json
 from requests.exceptions import HTTPError
 
@@ -25,6 +24,7 @@ for handle, name in tqdm(zip(df['Twitter Handle'], df['Name']), total=len(df)):
             pass
 
 # # Scrape facebook posts
+# from facebook_scraper import get_posts
 # warnings.filterwarnings("ignore", category=UserWarning)
 # os.makedirs('../datasets/facebook-posts', exist_ok=True)
 # for handle, name in tqdm(zip(df['Facebook Handle'], df['Name']), total=len(df)):

@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from transformers import TFAutoModelForSequenceClassification, AutoTokenizer
 from datasets import Dataset
-from explore_data import load_data
+from ultils import load_data, reduce_subclasses, keep_top_k_classes, random_undersample, augment
 
 
 def compute_metrics(pred):
@@ -56,12 +56,19 @@ def ds_to_tf_ds(dataset: Dataset, shuffle: bool = False, batch_size: int = 32,
 
 
 def train_eval(pretrained_model: str):
+    # Parameters
+    max_length = 256
+
     # Create folders to store results
     model_dir = os.path.join('fine-tuned-models', pretrained_model.replace('/', '-'))
     os.makedirs(model_dir, exist_ok=True)
 
     # Load data
-    annotated_texts = load_data(('AU', 'CA', 'IE', 'IL', 'NZ', 'SA', 'UK', 'US'))
+    annotated_texts = load_data()
+    annotated_texts = reduce_subclasses(annotated_texts, verbose=1)
+    annotated_texts = keep_top_k_classes(annotated_texts, k=22, verbose=1)
+    annotated_texts = random_undersample(annotated_texts, random_state=1, verbose=1)
+    annotated_texts = augment(annotated_texts, batch_size=32, max_length=max_length, verbose=1)
 
     # Encode label as ordinal variable
     label_encoder = OrdinalEncoder()
@@ -128,7 +135,7 @@ def train_eval(pretrained_model: str):
     model = TFAutoModelForSequenceClassification.from_pretrained(pretrained_model, num_labels=num_classes)
 
     # Reduce max input token count to save memory at the cost of accuracy
-    tokenizer.model_max_length = 256
+    tokenizer.model_max_length = max_length
     # default to right padding for model with absolute position embeddings
     tokenizer.padding_side = "right"
 
@@ -174,12 +181,13 @@ def train_eval(pretrained_model: str):
     with open(os.path.join(model_dir, 'train-history.joblib'), 'wb') as logs_file, \
             open(os.path.join(model_dir, 'scores.joblib'), 'wb') as scores_file:
         dump(scores, scores_file)
+        print(history)
         dump(history.histroy, logs_file)
 
 
 def main():
     # cached: EleutherAI/gpt-neo-1.3B, EleutherAI/gpt-neo-2.7B, gpt2-medium, gpt2-large, bert-base-cased
-    pretrained_models = ['roberta-base', 'bert-base']
+    pretrained_models = ['distilroberta-base', 'roberta-base', 'bert-base']
     for model in pretrained_models:
         train_eval(model)
 
