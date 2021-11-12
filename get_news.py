@@ -80,7 +80,7 @@ def get_salient_regions(text: str, key_term: str) -> List[List[int]] or None:
 
 
 # Driver code
-keywords = 'Joe Biden'
+keywords = ' '
 headers = {
     'x-api-key': "63US199aYQka9-nwR6xNtpH3WIEYAPLRuUijRWOxVwk"
     }
