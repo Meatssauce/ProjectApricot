@@ -3,7 +3,6 @@
 import os
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import OrdinalEncoder
 from category_encoders import BinaryEncoder, OneHotEncoder
 from joblib import dump
 import tensorflow as tf
@@ -77,7 +76,6 @@ def train_eval(pretrained_model: str, annotated_texts: pd.DataFrame = None, max_
     annotated_texts = reduce_subclasses(annotated_texts, verbose=1)
     annotated_texts = keep_top_k_classes(annotated_texts, k=22, verbose=1)
     annotated_texts = random_undersample(annotated_texts, random_state=1, verbose=1)
-    # annotated_texts = augment(annotated_texts, batch_size=32, max_length=max_length, verbose=1)
 
     # Split dataframe into train, validation and test, 6:2:2
     y, X = annotated_texts[['label']], annotated_texts.drop(columns=['label'])
@@ -86,6 +84,9 @@ def train_eval(pretrained_model: str, annotated_texts: pd.DataFrame = None, max_
     print(len(X_train), 'train examples')
     print(len(X_val), 'validation examples')
     print(len(X_test), 'test examples')
+
+    # Augment text
+    # X_train = augment(X_train, batch_size=32, max_length=max_length, verbose=1)
 
     # Encode label
     # label_encoder = BinaryEncoder()
@@ -111,9 +112,9 @@ def train_eval(pretrained_model: str, annotated_texts: pd.DataFrame = None, max_
     tokenizer.padding_side = "right"
 
     # Add special tokens
-    special_tokens_dict = {'bos_token': '[BOS]', 'eos_token': '[EOS]', 'pad_token': '[PAD]'}
-    tokenizer.add_special_tokens(special_tokens_dict)
-    model.resize_token_embeddings(len(tokenizer))
+    # special_tokens_dict = {'bos_token': '[BOS]', 'eos_token': '[EOS]', 'pad_token': '[PAD]'}
+    # tokenizer.add_special_tokens(special_tokens_dict)
+    # model.resize_token_embeddings(len(tokenizer))
     # # fix model padding token id
     # model.config.pad_token_id = tokenizer.pad_token
     # model.config.eos_token_id = tokenizer.eos_token
@@ -136,12 +137,7 @@ def train_eval(pretrained_model: str, annotated_texts: pd.DataFrame = None, max_
     # val_ds = ds_to_tf_ds(val_ds, batch_size=batch_size, features=tokenizer.model_input_names)
     # test_ds = ds_to_tf_ds(test_ds, batch_size=batch_size, features=tokenizer.model_input_names)
 
-    # for feature_batch, label_batch in train_ds.take(1):
-    #     print('Every feature:', list(feature_batch.keys()))
-    #     print('A batch of texts:', feature_batch['text'])
-    #     print('A batch of label:', label_batch)
-
-    # USe mixed precision to save memory
+    # Use mixed precision to save memory
     tf.keras.mixed_precision.set_global_policy('mixed_float16')
 
     # Train classifier, evaluate and save results
@@ -173,9 +169,9 @@ def train_eval(pretrained_model: str, annotated_texts: pd.DataFrame = None, max_
 
 def main(annotated_texts: pd.DataFrame = None):
     # cached: EleutherAI/gpt-neo-1.3B, EleutherAI/gpt-neo-2.7B, gpt2-medium, gpt2-large, bert-base-cased
-    pretrained_models = ['distilroberta-base', 'roberta-base', 'bert-base']
+    pretrained_models = ['bert-base-cased', 'roberta-base', 'distilroberta-base']
     for model in pretrained_models:
-        train_eval(model, annotated_texts=annotated_texts)
+        train_eval(model, annotated_texts=annotated_texts, max_length=256)
 
 
 if __name__ == '__main__':

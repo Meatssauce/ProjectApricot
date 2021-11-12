@@ -52,7 +52,7 @@ def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int
             verbose: int = 0) -> pd.DataFrame:
     """ Performs text augmentation
 
-    :param annotated_texts:
+    :param annotated_texts: training data
     :param batch_size:
     :param max_length:
     :param device: 'cpu' or 'cuda'
@@ -68,12 +68,12 @@ def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int
     # ])
 
     # Truncate
-    annotated_texts = annotated_texts.copy()
-    annotated_texts['text'] = np.where(annotated_texts['text'].str.len() > max_length,
-                                       annotated_texts['text'].str[:max_length],
-                                       annotated_texts['text'])
+    augmented_texts = annotated_texts.copy()
+    augmented_texts['text'] = np.where(augmented_texts['text'].str.len() > max_length,
+                                       augmented_texts['text'].str[:max_length],
+                                       augmented_texts['text'])
     # keep texts with at least two valid tokens
-    # annotated_texts = annotated_texts[annotated_texts['text'].str.contains(r'[a-zA-Z0-9]{2,}')]
+    augmented_texts = augmented_texts[augmented_texts['text'].str.contains(r'[a-zA-Z0-9]{2,}')]
 
     # Augment
     pipe = naf.Sequential([
@@ -87,9 +87,9 @@ def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int
         naw.SplitAug(aug_p=0.1, verbose=verbose)
     ])
     pipe.device = device
-    annotated_texts['text'] = pipe.augment(annotated_texts['text'].to_list())
+    augmented_texts['text'] = pipe.augment(augmented_texts['text'].to_list())
 
-    return annotated_texts
+    return augmented_texts
     # augmenters = [
     #     naw.ContextualWordEmbsAug(aug_p=0.3, model_path='bert-base-cased', action="insert",
     #                               batch_size=batch_size, verbose=verbose, device='cuda'),
@@ -99,17 +99,17 @@ def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int
     # ]
     # results = []
     # for augmenter in augmenters:
-    #     result = annotated_texts.copy()
+    #     result = augmented_texts.copy()
     #     result['text'] = augmenter.augment(result['text'].to_list())
     #     result['text'].str.replace(r"\s'\s", "'", regex=True)
     #     results.append(result)
 
     # # Merge append augmented data
-    # augmented_texts = pd.concat([annotated_texts] + results, ignore_index=True)
+    # augmented_texts = pd.concat([augmented_texts] + results, ignore_index=True)
     #
     # if verbose >= 1:
     #     i = 0
-    #     for pre, post in zip(annotated_texts['text'], results[0]['text']):
+    #     for pre, post in zip(augmented_texts['text'], results[0]['text']):
     #         print('pre:\n' + pre)
     #         print('post:\n' + post)
     #         i += 1
@@ -186,5 +186,5 @@ def zip_dir(source_dir):
     shutil.make_archive(source_dir, 'zip', source_dir)
 
 
-# zip_dir(os.path.join('../datasets', 'MARPOR', 'Annotated text'))
-unzip_dir('Annotated text.zip')
+# # zip_dir(os.path.join('../datasets', 'MARPOR', 'Annotated text'))
+# unzip_dir('Annotated text.zip')

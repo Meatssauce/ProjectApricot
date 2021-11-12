@@ -92,7 +92,7 @@ def continue_labelling(annotated_texts: pd.DataFrame, start_at: int = 0):
 
 def main():
     annotated_texts = load_data()
-    # save_report(annotated_texts)
+    # save_report(augmented_texts)
     save_class_count_plot(annotated_texts)
 
     annotated_texts = reduce_subclasses(annotated_texts, verbose=1)
@@ -100,13 +100,13 @@ def main():
     annotated_texts = random_undersample(annotated_texts, random_state=1, verbose=1)
     save_class_count_plot(annotated_texts, filename='class-count-plot-reduced-balanced.png')
 
-    # annotated_texts = augment(annotated_texts, verbose=1)
-    # save_class_count_plot(annotated_texts, filename='class-count-plot-reduced-balanced-augmented.png')
+    # augmented_texts = augment(augmented_texts, verbose=1)
+    # save_class_count_plot(augmented_texts, filename='class-count-plot-reduced-balanced-augmented.png')
 
-    # print(annotated_texts['label'].value_counts().describe())  # remove bottom 25% of classes?
-    # annotated_texts = reduce_subclasses(annotated_texts)
-    # print(annotated_texts['label'].value_counts().describe())
-    # continue_labelling(annotated_texts)
+    # print(augmented_texts['label'].value_counts().describe())  # remove bottom 25% of classes?
+    # augmented_texts = reduce_subclasses(augmented_texts)
+    # print(augmented_texts['label'].value_counts().describe())
+    # continue_labelling(augmented_texts)
 
 
 if __name__ == '__main__':
