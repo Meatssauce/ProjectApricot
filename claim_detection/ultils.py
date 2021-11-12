@@ -174,6 +174,10 @@ def load_data(countries: FrozenSet[str] = frozenset({'AU', 'CA', 'IE', 'IL', 'NZ
     return annotated_texts
 
 
+def inject_book_reviews():
+    pass
+
+
 def unzip_dir(filename):
     import zipfile as zf
     files = zf.ZipFile(filename, 'r')
