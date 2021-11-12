@@ -1,10 +1,11 @@
 import json
 import time
 from typing import List, Tuple
-
+import os
 import requests
 import pandas as pd
 import re
+from joblib import dump
 
 
 def find_news(headers: dict, params: dict) -> Tuple[dict, list]:
@@ -79,11 +80,12 @@ def get_salient_regions(text: str, key_term: str) -> List[List[int]] or None:
 
 
 # Driver code
+keywords = 'Joe Biden'
 headers = {
     'x-api-key': "63US199aYQka9-nwR6xNtpH3WIEYAPLRuUijRWOxVwk"
     }
 params = {
-    "q": '"Wild Footage"',  # search terms, supports boolean operations, use inner double quotes for exact match
+    "q": f'{keywords}',  # search terms, supports boolean operations, use inner double quotes for exact match
     "lang": "en",
     'countries': 'au',
     'to_rank': 10000,  # up to 10000th most popular result
@@ -98,6 +100,16 @@ params = {
 
 # Get all news
 results, articles = find_all_news(headers, params, max_articles=10)
-# pandas_table = pd.DataFrame(results['articles'])
 
+# Save all articles
+save_dir = os.path.join('datasets', 'news')
+os.makedirs(save_dir, exist_ok=True)
+articles_data = {k: [] for k in articles[0]}
+for article in articles:
+    for k, v in article.items():
+        articles_data[k].append(v)
+df = pd.DataFrame.from_dict(articles_data)
+df.to_csv(os.path.join(save_dir, f'{keywords}.csv'), index=False),
+# with open(os.path.join('news', 'results.joblib'), 'wb') as f:
+#     dump(results, f)
 print(articles)

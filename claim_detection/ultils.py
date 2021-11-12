@@ -48,9 +48,17 @@ def random_undersample(annotated_texts: pd.DataFrame, random_state: int = None, 
     return annotated_texts.groupby('label').sample(n=int(distribution['min']), random_state=random_state)
 
 
-def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int = 512,
+def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int = 512, device: str = 'cpu',
             verbose: int = 0) -> pd.DataFrame:
-    """Performs text augmentation"""
+    """ Performs text augmentation
+
+    :param annotated_texts:
+    :param batch_size:
+    :param max_length:
+    :param device: 'cpu' or 'cuda'
+    :param verbose:
+    :return:
+    """
     # pipe = naf.Sequential([
     #     # naw.back_translation.BackTranslationAug(max_length=max_length, batch_size=batch_size, verbose=verbose,
     #     #                                         device='cuda'),
@@ -64,16 +72,21 @@ def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int
     annotated_texts['text'] = np.where(annotated_texts['text'].str.len() > max_length,
                                        annotated_texts['text'].str[:max_length],
                                        annotated_texts['text'])
+    # keep texts with at least two valid tokens
+    # annotated_texts = annotated_texts[annotated_texts['text'].str.contains(r'[a-zA-Z0-9]{2,}')]
+
     # Augment
     pipe = naf.Sequential([
         naf.Sometimes([
-            naw.ContextualWordEmbsAug(aug_p=0.3, model_path='bert-base-cased', action="insert",
-                                      batch_size=batch_size, verbose=verbose, device='cuda'),
-            naw.ContextualWordEmbsAug(aug_p=0.3, model_path='bert-base-cased', action="substitute",
-                                      batch_size=batch_size, verbose=verbose, device='cuda')
+            naw.ContextualWordEmbsAug(aug_p=0.3, model_path='distilroberta-base', action="insert",
+                                      batch_size=batch_size, verbose=verbose),
+            naw.ContextualWordEmbsAug(aug_p=0.3, model_path='distilroberta-base', action="substitute",
+                                      batch_size=batch_size, verbose=verbose),
         ]),
-        naw.split.SplitAug(aug_p=0.3, min_char=2, verbose=verbose)
+        # naw.SynonymAug(aug_p=0.3, verbose=verbose),
+        naw.SplitAug(aug_p=0.1, verbose=verbose)
     ])
+    pipe.device = device
     annotated_texts['text'] = pipe.augment(annotated_texts['text'].to_list())
 
     return annotated_texts
@@ -88,11 +101,12 @@ def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int
     # for augmenter in augmenters:
     #     result = annotated_texts.copy()
     #     result['text'] = augmenter.augment(result['text'].to_list())
+    #     result['text'].str.replace(r"\s'\s", "'", regex=True)
     #     results.append(result)
-    #
+
     # # Merge append augmented data
     # augmented_texts = pd.concat([annotated_texts] + results, ignore_index=True)
-
+    #
     # if verbose >= 1:
     #     i = 0
     #     for pre, post in zip(annotated_texts['text'], results[0]['text']):
@@ -101,8 +115,20 @@ def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int
     #         i += 1
     #         if i >= 5:
     #             break
-
+    #
     # return augmented_texts
+
+    # augmentation ideas
+    # cannot use sentence level augmentations we only have quasi-sentences by themselves
+    # contextual embedding substitution, insertion
+    # minimal to no random shuffling - it can change the meaning of a sentence
+    # decent amount of word splitting - may be a frequent occurrence in scraped text
+    # speech style transformations (formal to casual to very casual)
+    # insertion of filler words (um, hum, like, i think, yeah, i mean, well, look)
+    # abstract summarization - maybe only for examples that are too long
+    # use reserved for phrase-to-phrase and phrase-to-word and word-to-phrase replacement -- use websites that do this
+    # use augmentation to address class imbalance (augment minority classes first)
+    # use an augmentation pipeline
 
 
 @cache
@@ -143,5 +169,22 @@ def load_data(countries: FrozenSet[str] = frozenset({'AU', 'CA', 'IE', 'IL', 'NZ
         .str.replace(r'^0$', '000', regex=True)  # political statements without clear category
         .str.replace('nan', 'N/A', regex=False)  # non-political statements
     )
+    annotated_texts['text'] = annotated_texts['text'].str.encode('ascii', 'ignore').str.decode('ascii')
 
     return annotated_texts
+
+
+def unzip_dir(filename):
+    import zipfile as zf
+    files = zf.ZipFile(filename, 'r')
+    files.extractall(filename[:-4])
+    files.close()
+
+
+def zip_dir(source_dir):
+    import shutil
+    shutil.make_archive(source_dir, 'zip', source_dir)
+
+
+# zip_dir(os.path.join('../datasets', 'MARPOR', 'Annotated text'))
+unzip_dir('Annotated text.zip')

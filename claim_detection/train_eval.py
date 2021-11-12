@@ -4,6 +4,7 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import OrdinalEncoder
+from category_encoders import BinaryEncoder, OneHotEncoder
 from joblib import dump
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
@@ -55,80 +56,50 @@ def ds_to_tf_ds(dataset: Dataset, shuffle: bool = False, batch_size: int = 32,
     return tf_dataset
 
 
-def train_eval(pretrained_model: str):
-    # Parameters
-    max_length = 256
+# def df_to_dataset(dataframe: pd.Dataframe, shuffle=False, batch_size=32) -> tf.data.Dataset:
+#     """A utility method to create a tf.data dataset from a Pandas Dataframe"""
+#     dataframe = dataframe.copy()
+#     labels = dataframe.pop('label')
+#     ds = tf.data.Dataset.from_tensor_slices((dict(dataframe), labels))
+#     if shuffle:
+#         ds = ds.shuffle(buffer_size=len(dataframe))
+#     ds = ds.batch(batch_size)
+#     return ds
 
+
+def train_eval(pretrained_model: str, annotated_texts: pd.DataFrame = None, max_length: int = 512):
     # Create folders to store results
     model_dir = os.path.join('fine-tuned-models', pretrained_model.replace('/', '-'))
     os.makedirs(model_dir, exist_ok=True)
 
     # Load data
-    annotated_texts = load_data()
+    annotated_texts = annotated_texts if annotated_texts is not None else load_data()
     annotated_texts = reduce_subclasses(annotated_texts, verbose=1)
     annotated_texts = keep_top_k_classes(annotated_texts, k=22, verbose=1)
     annotated_texts = random_undersample(annotated_texts, random_state=1, verbose=1)
-    annotated_texts = augment(annotated_texts, batch_size=32, max_length=max_length, verbose=1)
+    # annotated_texts = augment(annotated_texts, batch_size=32, max_length=max_length, verbose=1)
 
-    # Encode label as ordinal variable
-    label_encoder = OrdinalEncoder()
-    annotated_texts['label'] = label_encoder.fit_transform(annotated_texts[['label']])
-    num_classes = len(annotated_texts['label'].unique())
+    # Split dataframe into train, validation and test, 6:2:2
+    y, X = annotated_texts[['label']], annotated_texts.drop(columns=['label'])
+    X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle=True, random_state=1, test_size=0.2)
+    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25)
+    print(len(X_train), 'train examples')
+    print(len(X_val), 'validation examples')
+    print(len(X_test), 'test examples')
+
+    # Encode label
+    # label_encoder = BinaryEncoder()
+    label_encoder = OneHotEncoder()
+    y_train = label_encoder.fit_transform(y_train)
+    y_test = label_encoder.transform(y_test)
+    y_val = label_encoder.transform(y_val)
+    if not isinstance(y_train, pd.Series) and y_train.shape[1] > 1:
+        num_classes = y_train.shape[1]
+    else:
+        num_classes = len(annotated_texts['label'].unique())
 
     with open(os.path.join(model_dir, 'label_encoder.joblib'), 'wb') as f:
         dump(label_encoder, f)
-    # todo: save label_encoder or integrate it into a pipeline
-
-    # Split dataframe into train, validation and test, 6:2:2
-    train_df, test_df = train_test_split(annotated_texts, test_size=0.2)
-    train_df, val_df = train_test_split(train_df, test_size=0.25)
-    print(len(train_df), 'train examples')
-    print(len(val_df), 'validation examples')
-    print(len(test_df), 'test examples')
-
-    # Augmentation
-    # import nlpaug
-    # aug = naw.ContextualWordEmbsAug(
-    #     model_path='bert-base-uncased', action="insert")
-    # augmented_text = aug.augment(text)
-    # augmentation ideas
-    # cannot use sentence level augmentations we only have quasi-sentences by themselves
-    # contextual embedding substitution, insertion
-    # minimal to no random shuffling - it can change the meaning of a sentence
-    # decent amount of word splitting - may be a frequent occurrence in scraped text
-    # speech style transformations (formal to casual to very casual)
-    # insertion of filler words (um, hum, like, i think, yeah, i mean, well, look)
-    # abstract summarization - maybe only for examples that are too long
-    # use reserved for phrase-to-phrase and phrase-to-word and word-to-phrase replacement -- use websites that do this
-    # use augmentation to address class imbalance (augment minority classes first)
-    # use an augmentation pipeline
-
-    # def df_to_dataset(dataframe: pd.Dataframe, shuffle=False, batch_size=32) -> tf.data.Dataset:
-    #     """A utility method to create a tf.data dataset from a Pandas Dataframe"""
-    #     dataframe = dataframe.copy()
-    #     labels = dataframe.pop('label')
-    #     ds = tf.data.Dataset.from_tensor_slices((dict(dataframe), labels))
-    #     if shuffle:
-    #         ds = ds.shuffle(buffer_size=len(dataframe))
-    #     ds = ds.batch(batch_size)
-    #     return ds
-    #
-    #
-    # # Convert to tensorflow datasets
-    # batch_size = 32  # A small batch sized 5 is used for demonstration purposes
-    # train_ds = df_to_dataset(train_df, batch_size=batch_size)
-    # val_ds = df_to_dataset(val_df, batch_size=batch_size)
-    # test_ds = df_to_dataset(test_df, batch_size=batch_size)
-
-    # for feature_batch, label_batch in train_ds.take(1):
-    #     print('Every feature:', list(feature_batch.keys()))
-    #     print('A batch of texts:', feature_batch['text'])
-    #     print('A batch of label:', label_batch)
-
-    # Convert to huggingface Dataset
-    train_ds = Dataset.from_pandas(train_df)
-    val_ds = Dataset.from_pandas(val_df)
-    test_ds = Dataset.from_pandas(test_df)
 
     # Load Model and Tokenizer
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model)
@@ -147,16 +118,28 @@ def train_eval(pretrained_model: str):
     # model.config.pad_token_id = tokenizer.pad_token
     # model.config.eos_token_id = tokenizer.eos_token
 
+    # Convert to huggingface Dataset
+    # train_ds = Dataset.from_pandas(train_df)
+    # val_ds = Dataset.from_pandas(val_df)
+    # test_ds = Dataset.from_pandas(test_df)
     # Tokenize data
-    train_ds = train_ds.map(lambda x: tokenize(x, tokenizer), batched=True)
-    val_ds = val_ds.map(lambda x: tokenize(x, tokenizer), batched=True)
-    test_ds = test_ds.map(lambda x: tokenize(x, tokenizer), batched=True)
+    # train_ds = train_ds.map(lambda x: tokenize(x, tokenizer), batched=True)
+    # val_ds = val_ds.map(lambda x: tokenize(x, tokenizer), batched=True)
+    # test_ds = test_ds.map(lambda x: tokenize(x, tokenizer), batched=True)
+    X_train = tokenizer(X_train['text'].to_list(), padding='max_length', truncation=True, return_tensors='tf').data
+    X_val = tokenizer(X_val['text'].to_list(), padding='max_length', truncation=True, return_tensors='tf').data
+    X_test = tokenizer(X_test['text'].to_list(), padding='max_length', truncation=True, return_tensors='tf').data
 
     # Convert to Tensorflow Datasets
-    batch_size = 8
-    train_ds = ds_to_tf_ds(train_ds, shuffle=True, batch_size=batch_size, features=tokenizer.model_input_names)
-    val_ds = ds_to_tf_ds(val_ds, batch_size=batch_size, features=tokenizer.model_input_names)
-    test_ds = ds_to_tf_ds(test_ds, batch_size=batch_size, features=tokenizer.model_input_names)
+    # batch_size = 8
+    # train_ds = ds_to_tf_ds(train_ds, shuffle=True, batch_size=batch_size, features=tokenizer.model_input_names)
+    # val_ds = ds_to_tf_ds(val_ds, batch_size=batch_size, features=tokenizer.model_input_names)
+    # test_ds = ds_to_tf_ds(test_ds, batch_size=batch_size, features=tokenizer.model_input_names)
+
+    # for feature_batch, label_batch in train_ds.take(1):
+    #     print('Every feature:', list(feature_batch.keys()))
+    #     print('A batch of texts:', feature_batch['text'])
+    #     print('A batch of label:', label_batch)
 
     # USe mixed precision to save memory
     tf.keras.mixed_precision.set_global_policy('mixed_float16')
@@ -164,19 +147,22 @@ def train_eval(pretrained_model: str):
     # Train classifier, evaluate and save results
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=5e-5),
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-        metrics=[tf.metrics.SparseCategoricalAccuracy()],
+        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
+        metrics=[tf.metrics.CategoricalAccuracy()],
     )
+    # error when using f1_marco
+    # NotImplementedError: Cannot convert a symbolic Tensor (tf_roberta_for_sequence_classification/classifier/out_proj/BiasAdd:0) to a numpy array. This error may indicate that you're trying to pass a Tensor to a NumPy call, which is not supported
     model.summary()
 
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=1, verbose=1,
                                                       restore_best_weights=True)
     cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath="training_1/cp.ckpt", save_weights_only=True, verbose=1)
-    history = model.fit(train_ds, validation_data=val_ds, epochs=5, callbacks=[early_stopping, cp_callback])
+    history = model.fit(X_train, y_train, validation_data=(X_val, y_val), batch_size=8, epochs=5,
+                        callbacks=[early_stopping, cp_callback])
     model.save(model_dir)
     # model = tf.keras.models.load_model(os.path.join('fine-tuned-models', 'from-gpu-cloud', 'distilroberta-base',
     #                                                 'tf_model.h5'))
-    scores = model.evaluate(test_ds)
+    scores = model.evaluate(X_test, y_test)
 
     with open(os.path.join(model_dir, 'train-history.joblib'), 'wb') as logs_file, \
             open(os.path.join(model_dir, 'scores.joblib'), 'wb') as scores_file:
@@ -185,11 +171,11 @@ def train_eval(pretrained_model: str):
         dump(history.histroy, logs_file)
 
 
-def main():
+def main(annotated_texts: pd.DataFrame = None):
     # cached: EleutherAI/gpt-neo-1.3B, EleutherAI/gpt-neo-2.7B, gpt2-medium, gpt2-large, bert-base-cased
     pretrained_models = ['distilroberta-base', 'roberta-base', 'bert-base']
     for model in pretrained_models:
-        train_eval(model)
+        train_eval(model, annotated_texts=annotated_texts)
 
 
 if __name__ == '__main__':
