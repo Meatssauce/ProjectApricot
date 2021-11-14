@@ -1,17 +1,36 @@
-from ultils import load_data, augment
+import pandas as pd
+
+from ultils import load_data, augment, load_annotated_book_reviews, augment_book_review_data
 
 
-def main():
+def test_book_review_augmentation():
+    try:
+        reviews = pd.read_csv('reviews.csv').sample(10)
+    except:
+        reviews = load_annotated_book_reviews().sample(10)
+        reviews.to_csv('reviews.csv')
+    augmented_reviews = augment_book_review_data(reviews, drop_original=True, verbose=1)
+
+    for before, after in zip(reviews['text'], augmented_reviews['text']):
+        print(f"Before:\n{before}")
+        print(f"After:\n{after}")
+        print("-----------------------")
+
+
+def test_marpor_augmentation():
     df = load_data()
     df = df[:10]
-    df_augmented = augment(df, verbose=1)
+    df_augmented = augment(df, verbose=1, batch_size=8, drop_original=True)
 
     for before, after in zip(df['text'], df_augmented['text']):
         print(f"Before:\n{before}")
         print(f"After:\n{after}")
         print("-----------------------")
 
-    # Does not work as fastai cannot use multiprocessing on Windows
+
+def main():
+    test_marpor_augmentation()
+    # test_book_review_augmentation()
 
 
 if __name__ == "__main__":

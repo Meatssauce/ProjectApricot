@@ -96,7 +96,7 @@ def main():
     save_class_count_plot(annotated_texts)
 
     annotated_texts = reduce_subclasses(annotated_texts, verbose=1)
-    annotated_texts = keep_top_k_classes(annotated_texts, k=21, verbose=1)
+    annotated_texts = keep_top_k_classes(annotated_texts, k=20, plus=['N/A'], other='000', verbose=1)
     annotated_texts = random_undersample(annotated_texts, random_state=1, verbose=1)
     save_class_count_plot(annotated_texts, filename='class-count-plot-reduced-balanced.png')
 

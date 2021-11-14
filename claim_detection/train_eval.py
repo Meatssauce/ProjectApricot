@@ -10,7 +10,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from transformers import TFAutoModelForSequenceClassification, AutoTokenizer
 from datasets import Dataset
-from ultils import load_data, reduce_subclasses, keep_top_k_classes, random_undersample, augment
+from ultils import load_data, reduce_subclasses, keep_top_k_classes, random_undersample, augment, inject_book_reviews, \
+    load_annotated_book_reviews
 
 
 def compute_metrics(pred):
@@ -66,16 +67,18 @@ def ds_to_tf_ds(dataset: Dataset, shuffle: bool = False, batch_size: int = 32,
 #     return ds
 
 
-def train_eval(pretrained_model: str, annotated_texts: pd.DataFrame = None, max_length: int = 512):
+def train_eval(pretrained_model: str, annotated_texts: pd.DataFrame, reviews: pd.DataFrame,
+               max_length: int = 512):
     # Create folders to store results
     model_dir = os.path.join('fine-tuned-models', pretrained_model.replace('/', '-'))
     os.makedirs(model_dir, exist_ok=True)
 
     # Load data
-    annotated_texts = annotated_texts if annotated_texts is not None else load_data()
+    annotated_texts = inject_book_reviews(reviews, annotated_texts)
     annotated_texts = reduce_subclasses(annotated_texts, verbose=1)
-    annotated_texts = keep_top_k_classes(annotated_texts, k=22, verbose=1)
+    annotated_texts = keep_top_k_classes(annotated_texts, k=20, plus=['N/A'], other='000', verbose=1)
     annotated_texts = random_undersample(annotated_texts, random_state=1, verbose=1)
+    num_classes = len(annotated_texts['label'].unique())
 
     # Split dataframe into train, validation and test, 6:2:2
     y, X = annotated_texts[['label']], annotated_texts.drop(columns=['label'])
@@ -86,7 +89,10 @@ def train_eval(pretrained_model: str, annotated_texts: pd.DataFrame = None, max_
     print(len(X_test), 'test examples')
 
     # Augment text
-    # X_train = augment(X_train, batch_size=32, max_length=max_length, verbose=1)
+    train_df = pd.concat([X_train, y_train], axis=1)
+    train_df = augment(train_df, batch_size=8, max_length=max_length, verbose=1)
+    y_train, X_train = train_df[['label']], train_df.drop(columns=['label'])
+    assert len(X_train) == len(y_train)
 
     # Encode label
     # label_encoder = BinaryEncoder()
@@ -94,10 +100,6 @@ def train_eval(pretrained_model: str, annotated_texts: pd.DataFrame = None, max_
     y_train = label_encoder.fit_transform(y_train)
     y_test = label_encoder.transform(y_test)
     y_val = label_encoder.transform(y_val)
-    if not isinstance(y_train, pd.Series) and y_train.shape[1] > 1:
-        num_classes = y_train.shape[1]
-    else:
-        num_classes = len(annotated_texts['label'].unique())
 
     with open(os.path.join(model_dir, 'label_encoder.joblib'), 'wb') as f:
         dump(label_encoder, f)
@@ -153,7 +155,7 @@ def train_eval(pretrained_model: str, annotated_texts: pd.DataFrame = None, max_
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=1, verbose=1,
                                                       restore_best_weights=True)
     cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath="training_1/cp.ckpt", save_weights_only=True, verbose=1)
-    history = model.fit(X_train, y_train, validation_data=(X_val, y_val), batch_size=8, epochs=5,
+    history = model.fit(X_train, y_train, validation_data=(X_val, y_val), batch_size=8, epochs=15,
                         callbacks=[early_stopping, cp_callback])
     model.save(model_dir)
     # model = tf.keras.models.load_model(os.path.join('fine-tuned-models', 'from-gpu-cloud', 'distilroberta-base',
@@ -164,14 +166,17 @@ def train_eval(pretrained_model: str, annotated_texts: pd.DataFrame = None, max_
             open(os.path.join(model_dir, 'scores.joblib'), 'wb') as scores_file:
         dump(scores, scores_file)
         print(history)
-        dump(history.histroy, logs_file)
+        dump(history, logs_file)
 
 
-def main(annotated_texts: pd.DataFrame = None):
+def main(annotated_texts: pd.DataFrame = None, reviews: pd.DataFrame = None):
+    annotated_texts = annotated_texts if annotated_texts is not None else load_data()
+    reviews = reviews if reviews is not None else load_annotated_book_reviews()
+
     # cached: EleutherAI/gpt-neo-1.3B, EleutherAI/gpt-neo-2.7B, gpt2-medium, gpt2-large, bert-base-cased
-    pretrained_models = ['bert-base-cased', 'roberta-base', 'distilroberta-base']
+    pretrained_models = ['distilroberta-base', 'roberta-base', 'bert-base-cased']
     for model in pretrained_models:
-        train_eval(model, annotated_texts=annotated_texts, max_length=256)
+        train_eval(model, annotated_texts=annotated_texts, reviews=reviews, max_length=256)
 
 
 if __name__ == '__main__':

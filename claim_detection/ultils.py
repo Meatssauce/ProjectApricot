@@ -1,11 +1,19 @@
 import os
-from typing import Tuple, FrozenSet
+from typing import Tuple, FrozenSet, List
 
 import pandas as pd
 import numpy as np
 import nlpaug.flow as naf
 import nlpaug.augmenter.word as naw
 from functools import cache
+import ujson
+
+from tqdm import tqdm
+from wordcloud import WordCloud
+import zipfile as zf
+import shutil
+# from textaugment import Word2vec
+# import gensim.downloader as downloader
 
 
 def reduce_subclasses(annotated_texts: pd.DataFrame, verbose: int = 0) -> pd.DataFrame:
@@ -30,13 +38,28 @@ def reduce_subclasses(annotated_texts: pd.DataFrame, verbose: int = 0) -> pd.Dat
     return annotated_texts
 
 
-def keep_top_k_classes(annotated_texts: pd.DataFrame, k: int, verbose: int = 0) -> pd.DataFrame:
-    """Keep only top k most frequent classes, the rest are changed to 000."""
+def keep_top_k_classes(annotated_texts: pd.DataFrame, k: int, plus: List[str] = None, other: str = None,
+                       verbose: int = 0) -> pd.DataFrame:
+    """
+    Keep only top k most frequent classes plus specified classes, the rest are changed to a specific class.
+
+    :param annotated_texts:
+    :param k: top k classes to keep
+    :param plus: also keep these classes
+    :param other: change the rest into this class
+    :param verbose: set to 1 to show more info
+    :return:
+    """
     n_classes = len(annotated_texts['label'].unique())
-    top_k_classes = annotated_texts['label'].value_counts().index[:k]
-    annotated_texts['label'] = np.where(annotated_texts['label'].isin(top_k_classes), annotated_texts['label'], "000")
+    if plus is None:
+        plus = []
+    top_classes = [class_ for class_ in annotated_texts['label'].value_counts().index if class_ not in plus][:k] + plus
+    annotated_texts['label'] = np.where(annotated_texts['label'].isin(top_classes), annotated_texts['label'], other)
+
     if verbose > 0:
-        print(f"Kept top {k} classes: {top_k_classes.to_list()}. Set {n_classes} others to 000")
+        additional = f'Plus {plus}.' if plus else ''
+        print(f"Kept top {k} classes: {top_classes}. {additional} Set {n_classes} others to {other}")
+
     return annotated_texts
 
 
@@ -49,7 +72,7 @@ def random_undersample(annotated_texts: pd.DataFrame, random_state: int = None, 
 
 
 def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int = 512, device: str = 'cpu',
-            verbose: int = 0) -> pd.DataFrame:
+            verbose: int = 0, drop_original: bool = False) -> pd.DataFrame:
     """ Performs text augmentation
 
     :param annotated_texts: training data
@@ -57,6 +80,7 @@ def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int
     :param max_length:
     :param device: 'cpu' or 'cuda'
     :param verbose:
+    :param drop_original: set to True to return only augmented data
     :return:
     """
     # pipe = naf.Sequential([
@@ -89,7 +113,10 @@ def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int
     pipe.device = device
     augmented_texts['text'] = pipe.augment(augmented_texts['text'].to_list())
 
-    return augmented_texts
+    if drop_original:
+        return augmented_texts
+    else:
+        return pd.concat([annotated_texts, augmented_texts], axis=0)
     # augmenters = [
     #     naw.ContextualWordEmbsAug(aug_p=0.3, model_path='bert-base-cased', action="insert",
     #                               batch_size=batch_size, verbose=verbose, device='cuda'),
@@ -131,18 +158,71 @@ def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int
     # use an augmentation pipeline
 
 
+def augment_book_review_data(reviews: pd.DataFrame, batch_size: int = 32, max_length: int = 512, device: str = 'cpu',
+                             drop_original: bool = False, verbose: int = 0) -> pd.DataFrame:
+    # regularised_substitutes = {
+    #     'book': {'item', 'policy', 'idea', 'notion', 'undertaking', 'trip', 'experience', 'system'},
+    #     'read': {'support', 'change', 'review'},
+    #     'character': {'person', 'candidate', 'case', 'areas'},
+    #     'story': {'proposal', 'plan', 'picture', 'narrative'},
+    #     'author': {'entity', 'writer', 'speaker', 'person', 'company', 'people'},
+    # }
+    # all_reserved_tokens: List[List[str]] = [[k] + list(v) for k, v in regularised_substitutes.items()]
+    # all_reserved_tokens += [[e.capitalize() for e in tokens] for tokens in all_reserved_tokens]
+    # pipe = naf.Sequential([naw.ReservedAug(all_reserved_tokens)])
+    #
+    # augmented_reviews = reviews.copy()
+    # augmented_reviews['text'] = pipe.augment(reviews['text'].to_list())
+    # model = downloader.load('word2vec-google-news-300')
+    # aug_w2v = naw.WordEmbsAug(
+    #     model_type='word2vec',
+    #     # model_path='./GoogleNews-vectors-negative300.bin',
+    #     model=model,
+    #     action="substitute"
+    # )
+
+    reviews = reviews.copy()
+    reviews['text'] = np.where(reviews['text'].str.len() > max_length, reviews['text'].str[:max_length],
+                               reviews['text'])
+    # keep texts with at least two valid tokens
+    augmented_reviews = reviews[reviews['text'].str.contains(r'[a-zA-Z0-9]{2,}')]
+
+    aug_contextual = naw.ContextualWordEmbsAug(model_path='distilbert-base-cased', action='substitute', aug_p=0.5,
+                                               batch_size=batch_size, verbose=verbose, device=device)
+    augmented_reviews['text'] = aug_contextual.augment(reviews['text'].to_list())
+    augmented_reviews['text'] = augmented_reviews['text'].str.replace(r"\s'\s", "'", regex=True)
+
+    # Download Google Word2vec embeddings
+    # model = gensim.models.KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin.gz', binary=True)
+    # t = Word2vec(model=model)
+    # augmented_reviews = reviews.copy()
+    # augmented_reviews['text'] = [t.augment(text) for text in augmented_reviews['text']]
+    # augmented_reviews['text'] = augmented_reviews['text'].str.replace(r"\s'\s", "'", regex=True)
+
+    if drop_original:
+        return augmented_reviews
+    else:
+        return pd.concat([reviews, augmented_reviews], axis=0)
+
+
+def make_word_cloud(texts: str, filename: str = 'word-cloud.png') -> None:
+    cloud = WordCloud(background_color="white", max_words=5000, contour_width=3, contour_color='steelblue', width=800,
+                      height=400)
+    cloud.generate(texts)
+    cloud.to_image()
+    cloud.to_file(filename)
+
+
 @cache
 def load_data(countries: FrozenSet[str] = frozenset({'AU', 'CA', 'IE', 'IL', 'NZ', 'SA', 'UK', 'US'}),
-              return_raw=False, data_dir=None) -> pd.DataFrame:
+              return_raw=False, data_dir=os.path.join('..', 'datasets', 'MARPOR', 'Annotated text')) -> pd.DataFrame:
     """Load annotated text data from disk and performs basic preprocessing."""
-
     def read_and_tag_csv(path, country):
         df = pd.read_csv(path)
         df['country'] = country
         return df
 
     # Load annotated text from MARPOR corpus
-    data_dir = data_dir or os.path.join('../datasets', 'MARPOR', 'Annotated text')
     country_data_dirs = {country: os.path.join(data_dir, f'{country} 2001-2021')
                          for country in countries}
     annotated_texts_data = [
@@ -174,21 +254,47 @@ def load_data(countries: FrozenSet[str] = frozenset({'AU', 'CA', 'IE', 'IL', 'NZ
     return annotated_texts
 
 
-def inject_book_reviews():
-    pass
+@cache
+def load_annotated_book_reviews(file_path=os.path.join('..', 'datasets', 'non-political-texts',
+                                                       'goodreads_reviews_spoiler.json')) -> pd.DataFrame:
+    """Load goodreads spoilers book review data in appropriate format for classifier."""
+    # Load data
+    with open(file_path, 'r') as f:
+        reviews = [ujson.loads(line.rstrip()) for line in tqdm(f)]  # loads as dict from some reason
+    reviews = pd.DataFrame.from_records(reviews)
+
+    # Transform to conform to input format
+    reviews = reviews.rename(columns={'review_sentences': 'text'})
+    reviews = reviews[['text']].explode('text')
+    reviews['text'] = reviews['text'].str[1]
+    reviews['label'] = 'N/A'
+
+    # Basic preprocessing
+    reviews = reviews.dropna(subset=['text', 'label'], how='any')
+    reviews['text'] = reviews['text'].str.encode('ascii', 'ignore').str.decode('ascii')
+
+    return reviews[['text', 'label']]
+
+
+def inject_book_reviews(reviews: pd.DataFrame, annotated_texts: pd.DataFrame, multiplier: float = 1.0) -> pd.DataFrame:
+    """Add book review data as N/A labelled rows."""
+    current_size = len(annotated_texts[annotated_texts['label'] == 'N/A'])
+    injection_size = min(len(reviews), int(multiplier * current_size))
+    injection_df = reviews.sample(injection_size)
+    return pd.concat([annotated_texts, injection_df], axis=0)
 
 
 def unzip_dir(filename):
-    import zipfile as zf
     files = zf.ZipFile(filename, 'r')
     files.extractall(filename[:-4])
     files.close()
 
 
 def zip_dir(source_dir):
-    import shutil
     shutil.make_archive(source_dir, 'zip', source_dir)
 
 
-# # zip_dir(os.path.join('../datasets', 'MARPOR', 'Annotated text'))
+# zip_dir(os.path.join('../datasets', 'MARPOR', 'Annotated text'))
+# zip_dir(os.path.join('../datasets', 'non-political-texts'))
 # unzip_dir('Annotated text.zip')
+# unzip_dir('non-political-texts.zip')
