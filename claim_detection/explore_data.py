@@ -7,10 +7,10 @@ from pandas_profiling import ProfileReport
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pyperclip as pc
-from ultils import load_data, keep_top_k_classes, reduce_subclasses, augment, random_undersample
+from ultils import load_data, keep_top_k_classes, reduce_subclasses, augment, random_undersample, load_annotated_book_reviews
 
 
-def save_report(annotated_texts: pd.DataFrame):
+def save_report(annotated_texts: pd.DataFrame, file_path: str = None):
     profile = ProfileReport(
         annotated_texts,
         variables={
@@ -20,10 +20,10 @@ def save_report(annotated_texts: pd.DataFrame):
             }
         }
     )
-    profile.to_file('Profile Report - MARPOR AU 2001-2021.html')
+    profile.to_file(file_path)
 
 
-def save_class_count_plot(annotated_texts: pd.DataFrame, filename: str = 'class-count-plot.png'):
+def save_class_count_plot(annotated_texts: pd.DataFrame, file_path: str = 'class-count-plot.png'):
     plt.figure(figsize=(16, 6))
     ax = sns.countplot(data=annotated_texts, x='label', order=annotated_texts['label'].value_counts().index)
     ax.set_xticklabels(
@@ -34,7 +34,7 @@ def save_class_count_plot(annotated_texts: pd.DataFrame, filename: str = 'class-
         fontsize='10'
     )
     # plt.tight_layout()
-    plt.savefig(filename)
+    plt.savefig(file_path)
 
 
 def get_half_annotated(annotated_texts: pd.DataFrame) -> pd.DataFrame:
@@ -91,17 +91,21 @@ def continue_labelling(annotated_texts: pd.DataFrame, start_at: int = 0):
 
 
 def main():
+    plots_dir = os.path.join('plots')
+    os.makedirs(plots_dir, exist_ok=True)
+
     annotated_texts = load_data()
-    # save_report(augmented_texts)
-    save_class_count_plot(annotated_texts)
+    save_report(annotated_texts, file_path=os.path.join(plots_dir, 'MARPOR-EN-2001-2021-ProfileReport.html'))
+    save_class_count_plot(annotated_texts, file_path=os.path.join(plots_dir, 'class-count-plot.png'))
 
     annotated_texts = reduce_subclasses(annotated_texts, verbose=1)
     annotated_texts = keep_top_k_classes(annotated_texts, k=20, plus=['N/A'], other='000', verbose=1)
+    save_class_count_plot(annotated_texts, file_path=os.path.join(plots_dir, 'class-count-plot-reduced.png'))
     annotated_texts = random_undersample(annotated_texts, random_state=1, verbose=1)
-    save_class_count_plot(annotated_texts, filename='class-count-plot-reduced-balanced.png')
+    save_class_count_plot(annotated_texts, file_path=os.path.join(plots_dir, 'class-count-plot-reduced-balanced.png'))
 
     # augmented_texts = augment(augmented_texts, verbose=1)
-    # save_class_count_plot(augmented_texts, filename='class-count-plot-reduced-balanced-augmented.png')
+    # save_class_count_plot(augmented_texts, file_path='class-count-plot-reduced-balanced-augmented.png')
 
     # print(augmented_texts['label'].value_counts().describe())  # remove bottom 25% of classes?
     # augmented_texts = reduce_subclasses(augmented_texts)

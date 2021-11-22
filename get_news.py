@@ -8,9 +8,12 @@ import re
 from joblib import dump
 
 
-def find_news(headers: dict, params: dict) -> Tuple[dict, list]:
+def find_news(api_key: str, params: dict) -> Tuple[dict, list]:
     """Search news using newscatcher api. 10,000 calls, 1 API call/second, 1 month old articles"""
     # GET call api with the parameters provided
+    headers = {
+        'x-api-key': api_key
+    }
     response = requests.get("https://api.newscatcherapi.com/v2/search", headers=headers, params=params)
     if response.status_code != 200:
         raise APIError(f'API call failed')
@@ -24,7 +27,7 @@ def find_news(headers: dict, params: dict) -> Tuple[dict, list]:
     return results, results['articles']
 
 
-def find_all_news(headers: dict, params:dict, max_articles: int = None) -> Tuple[List[dict], List[dict]]:
+def find_all_news(api_key: str, params:dict, max_articles: int = None) -> Tuple[List[dict], List[dict]]:
     """Extract news on every page"""
     all_results = []
     all_articles = []
@@ -36,7 +39,7 @@ def find_all_news(headers: dict, params:dict, max_articles: int = None) -> Tuple
         print(f'Proceed extracting page number => {params["page"]}')
 
         try:
-            results, articles = find_news(headers, params)
+            results, articles = find_news(api_key, params)
         except APIError as e:
             raise APIError(f'API call failed for page number => {params["page"]}') from e
         else:
@@ -80,12 +83,10 @@ def get_salient_regions(text: str, key_term: str) -> List[List[int]] or None:
 
 
 # Driver code
-keywords = ' '
-headers = {
-    'x-api-key': "63US199aYQka9-nwR6xNtpH3WIEYAPLRuUijRWOxVwk"
-    }
+keywords = 'Elon Musk'
+api_key = "63US199aYQka9-nwR6xNtpH3WIEYAPLRuUijRWOxVwk"
 params = {
-    "q": f'{keywords}',  # search terms, supports boolean operations, use inner double quotes for exact match
+    "q": f'"{keywords}"',  # search terms, supports boolean operations, use inner double quotes for exact match
     "lang": "en",
     'countries': 'au',
     'to_rank': 10000,  # up to 10000th most popular result
@@ -99,7 +100,7 @@ params = {
 # pandas_table = pd.DataFrame(results['articles'])
 
 # Get all news
-results, articles = find_all_news(headers, params, max_articles=10)
+results, articles = find_all_news(api_key, params, max_articles=10)
 
 # Save all articles
 save_dir = os.path.join('datasets', 'news')

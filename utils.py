@@ -1,6 +1,11 @@
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import List, Union, Tuple, Set
+
+import pandas as pd
+import requests
 
 
 class VoteType(Enum):
@@ -40,3 +45,33 @@ class Politician:
     rebellion_rate: float = None
     attendance_rate: float = None
     party: Party = None
+
+
+def get_news_about(search_terms: Union[List[str], Set[str], Tuple[str], str], from_: datetime = None,
+                   to: datetime = None) -> pd.DataFrame:
+    """Get scraped news about specified keywords using newsapi.com"""
+    if isinstance(search_terms, str):
+        search_terms = [search_terms]
+
+    from_msg = '' if not from_ else f"from={str(from_)}&"
+    to_msg = '' if not to else f"to={str(to)}&"
+
+    results = []
+    for search_term in search_terms:
+        url = ('https://newsapi.org/v2/everything?'
+               f'q={search_term}&'
+               f'{from_msg}'
+               f'{to_msg}'
+               'sortBy=popularity&'
+               'sources=bbc-news&'
+               'apiKey=7cdfcc7872594e14b197bafdb9b6da04')
+        response = requests.get(url)
+        results.append(pd.DataFrame.from_dict(response.json()['articles']))
+    results = pd.concat(results, axis=0, ignore_index=True)
+
+    return results
+
+
+def get_federal_parliament_members() -> List[str]:
+    """Get a dataframe containing names of current members of the federal parliament"""
+    return pd.read_csv(os.path.join('datasets', 'parliament-members.csv'))['Name'].to_list()

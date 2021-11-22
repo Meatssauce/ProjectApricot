@@ -53,7 +53,8 @@ def keep_top_k_classes(annotated_texts: pd.DataFrame, k: int, plus: List[str] = 
     n_classes = len(annotated_texts['label'].unique())
     if plus is None:
         plus = []
-    top_classes = [class_ for class_ in annotated_texts['label'].value_counts().index if class_ not in plus][:k] + plus
+    top_classes = [class_ for class_ in annotated_texts['label'].value_counts().index
+                   if class_ not in plus + [other]][:k] + plus
     annotated_texts['label'] = np.where(annotated_texts['label'].isin(top_classes), annotated_texts['label'], other)
 
     if verbose > 0:
@@ -250,18 +251,24 @@ def load_data(countries: FrozenSet[str] = frozenset({'AU', 'CA', 'IE', 'IL', 'NZ
         .str.replace('nan', 'N/A', regex=False)  # non-political statements
     )
     annotated_texts['text'] = annotated_texts['text'].str.encode('ascii', 'ignore').str.decode('ascii')
+    annotated_texts = annotated_texts.dropna(subset=['text', 'label'], how='any')
 
     return annotated_texts
 
 
 @cache
 def load_annotated_book_reviews(file_path=os.path.join('..', 'datasets', 'non-political-texts',
-                                                       'goodreads_reviews_spoiler.json')) -> pd.DataFrame:
+                                                       'goodreads_reviews_spoiler.json'),
+                                return_raw=False) -> pd.DataFrame:
     """Load goodreads spoilers book review data in appropriate format for classifier."""
     # Load data
     with open(file_path, 'r') as f:
         reviews = [ujson.loads(line.rstrip()) for line in tqdm(f)]  # loads as dict from some reason
     reviews = pd.DataFrame.from_records(reviews)
+
+    if return_raw:
+        # Return dataframe without basic preprocessing
+        return reviews
 
     # Transform to conform to input format
     reviews = reviews.rename(columns={'review_sentences': 'text'})
@@ -270,8 +277,8 @@ def load_annotated_book_reviews(file_path=os.path.join('..', 'datasets', 'non-po
     reviews['label'] = 'N/A'
 
     # Basic preprocessing
-    reviews = reviews.dropna(subset=['text', 'label'], how='any')
     reviews['text'] = reviews['text'].str.encode('ascii', 'ignore').str.decode('ascii')
+    reviews = reviews.dropna(subset=['text', 'label'], how='any')
 
     return reviews[['text', 'label']]
 
