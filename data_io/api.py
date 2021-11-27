@@ -113,7 +113,7 @@ class WebhoseIO:
                    filters: dict = None,
                    time_since: datetime.timedelta = datetime.timedelta(days=3),
                    sort_: str = SortingPolicy.get_default().value,
-                   batch_size: int = 10,
+                   batch_size: int = 100,
                    max_batches: int = float('inf'),
                    cool_down_duration: datetime.timedelta = datetime.timedelta(seconds=1),
                    **kwargs) -> None:
@@ -144,6 +144,9 @@ class WebhoseIO:
             warnings.warn('\nSorting by any sort parameter value other than CRAWL_DATE (default) may result in missing'
                           ' important posts. \nIf data integrity is important, stick with the default recommended sort'
                           ' parameter value of crawl date, and consume the data as a stream.', ParamsWarning)
+        if batch_size < 100:
+            warnings.warn(f'Setting batch size to {batch_size} instead of the default 100 may lead to extra API '
+                          f'calls.')
 
         # Parse query string
         query_string = ''
@@ -224,15 +227,17 @@ class WebhoseIO:
     def _response_writer(self, queue: Queue, end_point_str: str):
         response = None
         api_rate_limiter = RateLimiter(self.cool_down_duration)
+        i = 0
 
-        for i in range(self.max_batches):
+        while True:
             response = self._get_next() if response else self._query(end_point_str, self.params)
             queue.put(response)
 
-            if response['moreResultsAvailable'] == 0:
+            if i >= self.max_batches - 1 or response['moreResultsAvailable'] == 0:
                 break
             else:
                 next(api_rate_limiter)
+                i += 1
         queue.put(self._end_of_queue)
 
 

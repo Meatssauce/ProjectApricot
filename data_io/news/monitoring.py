@@ -1,18 +1,24 @@
 import json
 import os
+from math import ceil
+
 import pandas as pd
 import datetime
-import time
-from data_io.api import DataType, Format, SortingPolicy, to_timestamp, get_params, PRIVATE_API_KEY, RateLimiter
-import webhoseio
+
+from transformers import AutoTokenizer
+
+from data_io.api import DataType, SortingPolicy, PRIVATE_API_KEY, WebhoseIO
 from nltk.tokenize import sent_tokenize
 from functools import cache
 import tensorflow as tf
-from tqdm import tqdm
+import tensorflow_addons as tfa
+
+from definitions import ROOT_DIR
 
 
 @cache
-def get_hot_topics(num_topics: int = 10, lookback_window: datetime.timedelta = None, max_articles: int = None,
+def get_hot_topics(num_topics: int = 10,
+                   lookback_window: datetime.timedelta = datetime.timedelta(days=30), max_articles: int = float('inf'),
                    from_saved: bool = False) -> tuple:
     """
     Get n most viewed political topics in news articles up to a point in the past.
@@ -23,9 +29,10 @@ def get_hot_topics(num_topics: int = 10, lookback_window: datetime.timedelta = N
     :param from_saved: load from saved data instead of downloading from API (may cause data to be outdated)
     :return: a tuple containing n hottest topics discussed in news articles up to this far into the past.
     """
+
     def calculate_exposure(dataframe: pd.DataFrame, time_period: datetime.timedelta,
                            drop: bool = False) -> pd.DataFrame:
-        monthly_visitors = 15.925 * 10**6  # https://www.similarweb.com/website/news.com.au/#overview
+        monthly_visitors = 15.925 * 10 ** 6  # https://www.similarweb.com/website/news.com.au/#overview
         key_metrics = ['facebook.likes', 'facebook.comments', 'facebook.shares', 'pinterest.shares', 'vk.shares']
 
         # simple approach:
@@ -47,13 +54,9 @@ def get_hot_topics(num_topics: int = 10, lookback_window: datetime.timedelta = N
     # Input validation
     if num_topics <= 0:
         raise ValueError('num_topics must be a positive integer.')
-    # Set default values
-    if not lookback_window:
-        lookback_window = datetime.timedelta(days=30)
 
     # Load news
-    docs = get_au_political_news_over_t(lookback_window=lookback_window, max_articles=max_articles,
-                                        from_saved=from_saved)
+    docs = get_au_political_news_over_t(time_since=lookback_window, max_articles=max_articles, from_saved=from_saved)
 
     articles = pd.DataFrame.from_records([e['article'] for e in docs])
     socials = pd.json_normalize(articles['social'])
@@ -68,73 +71,67 @@ def get_hot_topics(num_topics: int = 10, lookback_window: datetime.timedelta = N
     recent_news['text'] = recent_news['text'].apply(sent_tokenize)  # optimize this!
     recent_news = recent_news.explode('text')
 
-    engagement, sentences = recent_news['engagement'], recent_news['text']
-    model = tf.keras.models.load_model(os.path.join('....', 'claim_detection', 'final-fine-tuned-models',
-                                                    'distilroberta-base', 'tf_model.h5'))
+    tokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
+    model = tf.keras.models.load_model(os.path.join(ROOT_DIR, 'claim_detection', 'final-fine-tuned-models',
+                                                    'distilroberta-base'),
+                                       custom_objects={'tfa.metrics.F1Score': tfa.metrics.F1Score})
 
+    sentences = tokenizer(recent_news['text'].to_list(), padding='max_length', truncation=True,
+                          return_tensors='tf').data
     topics = model.predict(sentences)
 
-    viewed_topics = pd.DataFrame({'topic': topics, 'engagement': engagement})
-    total_views = viewed_topics.groupby('topic').sum()  # get total views for each topic
+    viewed_topics = (pd.DataFrame({'topic': topics, 'engagement': recent_news['engagement']})
+                     .groupby('topic')
+                     .sum()  # get total views for each topic
+                     .sort_values(by='engagement', axis=0, ascending=False, kind='mergesort', ignore_index=True))
     # should engagements be linear? e.g. is a single article with 1 engagement just as good as two articles with 0.5?
 
-    return total_views.sort_values(by='engagement', axis=0, ascending=False, kind='mergesort', ignore_index=True)
+    return viewed_topics[:num_topics]
 
 
 @cache
-def get_au_political_news_over_t(lookback_window: datetime.timedelta, max_articles: int = None,
+def get_au_political_news_over_t(time_since: datetime.timedelta, max_articles: int = float('inf'),
                                  save: bool = True, from_saved: bool = False) -> list:
     """
     Download all australian political news from webhose API up to a certain point in the past
 
-    :param lookback_window: amount of time into the past to look for
+    :param time_since: amount of time into the past to look for
     :param max_articles: maximum number of articles to load before returning
     :param save: save downloaded data before returning
     :param from_saved: load from saved data instead of downloading from API (may cause data to be outdated)
     :return: a json object containing the results
     """
-    # Set default values
-    if max_articles is None:
-        max_articles = float('inf')
 
     cache_dir = os.path.join('datasets', 'cache')
 
+    if from_saved:
+        with open(os.path.join(cache_dir, 'recent_news.json'), 'r') as f:
+            return json.load(f)
     if save:
         os.makedirs(cache_dir, exist_ok=True)
 
-    if from_saved:
-        with open(os.path.join(cache_dir, 'recent_news.json'), 'w') as f:
-            return json.load(f)
+    webhoseio = WebhoseIO(token=PRIVATE_API_KEY)
 
-    min_cool_down = datetime.timedelta(seconds=1)
-    webhoseio.config(token=PRIVATE_API_KEY)
-    query_params = get_params(
+    webhoseio.set_params(
         filters={'language': 'english', 'category': 'politics', 'site.country': 'AU'},
-        size=100,
-        ts=int((datetime.datetime.now() - lookback_window).timestamp())
+        time_since=time_since,
+        max_batches=ceil(max_articles / (max_batch_size := 100)) if max_articles < float('inf') else float('inf')
     )
+    docs = webhoseio.query(DataType.ENRICHED_NEWS.value)
 
-    api_rate_limiter = RateLimiter(datetime.timedelta(seconds=1))
-    docs = []
-    results = webhoseio.query(DataType.ENRICHED_NEWS.value, query_params)
-    with tqdm(total=max(results['moreResultsAvailable'], query_params['size'])) as pbar:
-        while results['moreResultsAvailable'] > 0 and len(docs) < max_articles:
-            tic = time.perf_counter()
-
-            docs += results['docs']
-
-            # Cool down if needed
-            cool_down = min_cool_down - datetime.timedelta(seconds=time.perf_counter() - tic)
-            if (seconds := cool_down.total_seconds()) > 0:
-                time.sleep(seconds)
-
-            results = webhoseio.get_next()
-            pbar.update(query_params['size'])
+    if save:
+        with open(os.path.join(cache_dir, 'recent_news.json'), 'w') as f:
+            json.dump(docs, f)
 
     return docs
 
 
-# Test only
-# df = get_au_political_news_over_t(lookback_window=datetime.timedelta(days=3), max_articles=100)
-hot_topics = get_hot_topics(10, lookback_window=datetime.timedelta(days=7))
-pass
+def main():
+    # Test only
+    # df = get_au_political_news_over_t(time_since=datetime.timedelta(days=3), max_articles=100)
+    hot_topics = get_hot_topics(10, lookback_window=datetime.timedelta(days=7))
+    pass
+
+
+if __name__ == '__main__':
+    main()
