@@ -102,12 +102,10 @@ def augment(annotated_texts: pd.DataFrame, batch_size: int = 32, max_length: int
 
     # Augment
     pipe = naf.Sequential([
-        naf.Sometimes([
-            naw.ContextualWordEmbsAug(aug_p=0.3, model_path='distilroberta-base', action="insert",
-                                      batch_size=batch_size, verbose=verbose),
-            naw.ContextualWordEmbsAug(aug_p=0.3, model_path='distilroberta-base', action="substitute",
-                                      batch_size=batch_size, verbose=verbose),
-        ]),
+        naw.ContextualWordEmbsAug(aug_p=0.3, model_path='distilroberta-base', action="insert",
+                                  batch_size=batch_size, verbose=verbose),
+        naw.ContextualWordEmbsAug(aug_p=0.3, model_path='distilroberta-base', action="substitute",
+                                  batch_size=batch_size, verbose=verbose),
         # naw.SynonymAug(aug_p=0.3, verbose=verbose),
         naw.SplitAug(aug_p=0.1, verbose=verbose)
     ])
@@ -259,11 +257,16 @@ def load_data(countries: FrozenSet[str] = frozenset({'AU', 'CA', 'IE', 'IL', 'NZ
 @cache
 def load_annotated_book_reviews(file_path=os.path.join('..', 'datasets', 'non-political-texts',
                                                        'goodreads_reviews_spoiler.json'),
+                                load_size: int = float('inf'),
                                 return_raw=False) -> pd.DataFrame:
     """Load goodreads spoilers book review data in appropriate format for classifier."""
     # Load data
     with open(file_path, 'r') as f:
-        reviews = [ujson.loads(line.rstrip()) for line in tqdm(f)]  # loads as dict from some reason
+        reviews = []
+        for i, line in enumerate(f):
+            reviews.append(ujson.loads(line.rstrip()))
+            if i >= load_size:
+                break
     reviews = pd.DataFrame.from_records(reviews)
 
     if return_raw:
@@ -283,12 +286,17 @@ def load_annotated_book_reviews(file_path=os.path.join('..', 'datasets', 'non-po
     return reviews[['text', 'label']]
 
 
-def inject_book_reviews(reviews: pd.DataFrame, annotated_texts: pd.DataFrame, multiplier: float = 1.0) -> pd.DataFrame:
+def inject_book_reviews(annotated_texts: pd.DataFrame, reviews_file_path: str = None, multiplier: float = 1.0) -> pd.DataFrame:
     """Add book review data as N/A labelled rows."""
     current_size = len(annotated_texts[annotated_texts['label'] == 'N/A'])
-    injection_size = min(len(reviews), int(multiplier * current_size))
-    injection_df = reviews.sample(injection_size)
-    return pd.concat([annotated_texts, injection_df], axis=0)
+    injection_size = int(multiplier * current_size)
+
+    if reviews_file_path:
+        reviews = load_annotated_book_reviews(reviews_file_path, load_size=injection_size)
+    else:
+        reviews = load_annotated_book_reviews(load_size=injection_size)
+
+    return pd.concat([annotated_texts, reviews], axis=0, ignore_index=True)
 
 
 def unzip_dir(filename):
