@@ -165,19 +165,19 @@ class WebhoseIO:
             **kwargs
         }
 
-    def query(self, end_point_str: str) -> list:
+    def query(self, end_point: DataType) -> list:
         """A more user-friendly alternative of webhoseio's official query method that shows warnings and uses
         multithreading to maximise speed."""
-        # Basic input validation - not complete
-        if end_point_str == DataType.NEWS_BLOGS_AND_FORMS.value:
+        # Basic input validation - incomplete
+        if end_point == DataType.NEWS_BLOGS_AND_FORMS:
             if 'category:' in self.params['q']:
                 raise ParamsError("Cannot query NEWS_BLOGS_AND_FORMS with parameter 'category'.")
             if 'site.country:' in self.params['q'] or 'item.country:' in self.params['q']:
                 raise ParamsError("Invalid country filter for querying NEWS_BLOGS_AND_FORMS.")
-        elif end_point_str == DataType.ENRICHED_NEWS.value:
+        elif end_point == DataType.ENRICHED_NEWS:
             if 'thread.country:' in self.params['q'] or 'item.country:' in self.params['q']:
                 raise ParamsError("Invalid country filter for querying ENRICHED_NEWS.")
-        elif end_point_str == DataType.REVIEWS.value:
+        elif end_point == DataType.REVIEWS:
             if 'thread.country:' in self.params['q'] or 'site.country:' in self.params['q']:
                 raise ParamsError("Invalid country filter for querying ENRICHED_NEWS.")
         warnings.warn("\nThe webhose news API does not return warnings as expected. This method only provides minimal "
@@ -187,7 +187,7 @@ class WebhoseIO:
         response_queue = Queue()
 
         # Write API response to queue in another thread
-        writer_process = Process(target=self._response_writer, args=(response_queue, end_point_str))
+        writer_process = Process(target=self._response_writer, args=(response_queue, end_point.value))
         writer_process.start()
 
         # Process API responses added to the queue in main thread
@@ -236,7 +236,9 @@ class WebhoseIO:
             if i >= self.max_batches - 1 or response['moreResultsAvailable'] == 0:
                 break
             else:
+                print(time.perf_counter())
                 next(api_rate_limiter)
+                print(time.perf_counter())
                 i += 1
         queue.put(self._end_of_queue)
 
@@ -251,17 +253,17 @@ def main():
     webhoseio = WebhoseIO(token=PRIVATE_API_KEY)
 
     webhoseio.set_params(
-        # keywords="\"Mark Dreyfus\"",
+        keywords="\"Mark Dreyfus\"",
         filters={
             'language': 'english',
-            'category': 'politics',
-            'site.country': 'AU'
+            # 'category': 'politics',
+            'thread.country': 'AU'
         },
         time_since=datetime.timedelta(days=3),
         batch_size=100,
         max_batches=3,
     )
-    output = webhoseio.query(DataType.ENRICHED_NEWS.value)
+    output = webhoseio.query(DataType.NEWS_BLOGS_AND_FORMS)
     print(output)
     # print(output['posts'][0]['text'])  # Print the text of the first post
     # print(output['posts'][0]['published'])  # Print the text of the first post publication date

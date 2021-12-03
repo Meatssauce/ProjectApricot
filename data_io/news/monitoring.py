@@ -5,7 +5,7 @@ from math import ceil
 import pandas as pd
 import datetime
 
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
 
 from data_io.api import DataType, SortingPolicy, PRIVATE_API_KEY, WebhoseIO
 from nltk.tokenize import sent_tokenize
@@ -72,9 +72,9 @@ def get_hot_topics(num_topics: int = 10,
     recent_news = recent_news.explode('text')
 
     tokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
-    model = tf.keras.models.load_model(os.path.join(ROOT_DIR, 'claim_detection', 'final-fine-tuned-models',
-                                                    'distilroberta-base'),
-                                       custom_objects={'tfa.metrics.F1Score': tfa.metrics.F1Score})
+    model = TFAutoModelForSequenceClassification.from_pretrained(
+        os.path.join(ROOT_DIR, 'claim_detection', 'final-fine-tuned-models', 'distilroberta-base'),
+        custom_objects={'tfa.metrics.F1Score': tfa.metrics.F1Score})
 
     sentences = tokenizer(recent_news['text'].to_list(), padding='max_length', truncation=True,
                           return_tensors='tf').data
@@ -129,7 +129,8 @@ def get_au_political_news_over_t(time_since: datetime.timedelta, max_articles: i
 def main():
     # Test only
     # df = get_au_political_news_over_t(time_since=datetime.timedelta(days=3), max_articles=100)
-    hot_topics = get_hot_topics(10, lookback_window=datetime.timedelta(days=7))
+    hot_topics = get_hot_topics(10, lookback_window=datetime.timedelta(days=3))
+    print(hot_topics)
     pass
 
 
