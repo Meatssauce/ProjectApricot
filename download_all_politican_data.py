@@ -15,3 +15,5 @@ output_dir = os.path.join(ROOT_DIR, 'datasets', 'tvfy')
 os.makedirs(output_dir, exist_ok=True)
 with open(os.path.join(output_dir, 'politicians_and_policies.json'), 'w') as f:
     json.dump(politicians_data, f)
+with open(os.path.join(output_dir, 'politicians_and_policies_sample.json'), 'w') as f:
+    json.dump(politicians_data[:5], f)
