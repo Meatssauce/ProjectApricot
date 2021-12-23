@@ -10,11 +10,9 @@ import joblib
 import pandas as pd
 import ujson
 from tqdm import tqdm
-from multiprocessing import Process, Queue, Lock
-from collections.abc import Iterable, Iterator
-import time
+from multiprocessing import Process, Queue
 import requests
-from functools import cache
+from . import CoolDownIterator
 
 from definitions import ROOT_DIR
 
@@ -91,28 +89,6 @@ class ParamsWarning(Warning):
 
 class ParamsError(ValueError):
     pass
-
-
-class CoolDownIterator(Iterator):
-    """Thread-safe iterator that with a blocking cool down after each iteration."""
-
-    def __init__(self, iterable: Iterable, cool_down: datetime.timedelta = datetime.timedelta(seconds=0)):
-        self._lock = Lock()
-        self._cool_down = ceil(abs(cool_down).total_seconds())
-        self._next_yield_time = float('-inf')
-        self._iterable = iter(iterable) if iterable else itertools.count()
-
-    def __next__(self):
-        with self._lock:
-            if time.perf_counter() < self._next_yield_time:
-                time.sleep(self._next_yield_time - time.perf_counter())
-
-            self._next_yield_time = time.perf_counter() + self._cool_down
-
-            return self._iterable.__next__()
-
-    def __iter__(self):
-        return self
 
 
 class WebhoseIO:
