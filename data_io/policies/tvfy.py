@@ -1,4 +1,3 @@
-import re
 from typing import Union
 import requests
 import pandas as pd
@@ -81,8 +80,8 @@ class TvfyData:
         return all_details
 
 
-client = TvfyData(PRIVATE_API_KEY)
-people = pd.json_normalize(client.get_all_people())
-policies = pd.json_normalize(client.get_all_policies())
-all_personal_details = pd.json_normalize(client.get_all_personal_details())
-...
+# client = TvfyData(PRIVATE_API_KEY)
+# people = pd.json_normalize(client.get_all_people())
+# policies = pd.json_normalize(client.get_all_policies())
+# all_personal_details = pd.json_normalize(client.get_all_personal_details())
+# ...
