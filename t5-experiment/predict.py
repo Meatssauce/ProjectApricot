@@ -8,7 +8,7 @@ from transformers import (
     T5TokenizerFast
 )
 import numpy as np
-from definitions import ROOT_DIR, MODEL_DIR, CHECKPOINT_DIR, TRAIN_LOGS_DIR, DATASET_DIR, SEED
+from definitions import ROOT_DIR, MODEL_DIR, CHECKPOINT_DIR, TRAIN_LOGS_DIR, CACHED_DATASET_DIR, SEED
 import os
 from sklearn.metrics import confusion_matrix, f1_score
 from finetune import prepare_data, plot_confusion_matrix
@@ -18,7 +18,7 @@ from scipy import stats
 def main():
     model_name = 't5-base'
 
-    dataset_path = os.path.join(DATASET_DIR, 'snli_processed.dat')
+    dataset_path = os.path.join(CACHED_DATASET_DIR, 'snli_processed.dat')
     tokenizer = T5TokenizerFast.from_pretrained(model_name)
 
     tokenized_dataset = load_from_disk(dataset_path)['validation']

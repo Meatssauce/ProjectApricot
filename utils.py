@@ -74,4 +74,4 @@ def get_news_about(search_terms: Union[List[str], Set[str], Tuple[str], str], fr
 
 def get_federal_parliament_members() -> List[str]:
     """Get a dataframe containing names of current members of the federal parliament"""
-    return pd.read_csv(os.path.join('datasets', 'parliament-members.csv'))['Name'].to_list()
+    return pd.read_csv(os.path.join('datasets', 'datasets/parliament-members.csv'))['Name'].to_list()

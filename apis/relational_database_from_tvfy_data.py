@@ -2,8 +2,8 @@ import pandas as pd
 import os
 from definitions import ROOT_DIR
 
-data_dir = os.path.join(ROOT_DIR, 'datasets', 'tvfy',)
-data = pd.read_json(os.path.join(data_dir, "politicians_and_policies_sample.json"))
+data_dir = os.path.join(ROOT_DIR, 'datasets', 'tvfy', )
+data = pd.read_json(os.path.join(data_dir, "politicians_and_policies.json"))
 
 latest_member = pd.json_normalize(data["latest_member"]).rename({'id': 'latest_member.id'}, axis=1)
 general_stats = pd.concat([data.drop(columns=['latest_member', 'offices', 'policy_comparisons']), latest_member], axis=1)

@@ -17,11 +17,12 @@ from transformers import (
 from transformers.optimization import Adafactor, AdafactorSchedule
 import numpy as np
 import pandas as pd
-from definitions import ROOT_DIR, MODEL_DIR, CHECKPOINT_DIR, TRAIN_LOGS_DIR, CACHED_DATASET_DIR, SEED, \
-    SNLI_PROCESSED_PATH
+from definitions import ROOT_DIR, MODEL_DIR, CHECKPOINT_DIR, TRAIN_LOGS_DIR, CACHED_DATASET_DIR, SEED, DOCNLI_DIR, \
+    DOCNLI_PROCESSED_PATH
 import os
 from sklearn.metrics import confusion_matrix, f1_score
 import seaborn as sns
+import ujson
 
 
 def tokenize_dataset(dataset, tokenizer) -> DatasetDict:
@@ -29,9 +30,9 @@ def tokenize_dataset(dataset, tokenizer) -> DatasetDict:
     with tokenizer.as_target_tokenizer():
         dataset = dataset.map(
             lambda x: tokenizer(
-                dataset['train'].features['labels'].int2str(x['labels']),
+                x['labels'],
                 padding='max_length',
-                max_length=5,
+                max_length=6,
                 truncation=True,
                 return_attention_mask=False,
                 return_tensors='np'
@@ -53,16 +54,25 @@ def tokenize_dataset(dataset, tokenizer) -> DatasetDict:
             truncation=True,
             return_tensors='np'
         ),
-        batched=True
+        batched=True,
+        batch_size=128,
+        num_proc=3,
     )
 
     return dataset
 
 
 def prepare_data(tokenizer) -> DatasetDict:
-    """Data preparation pipeline for SNLI"""
-    # load dataset from huggingface only because it's easier
-    dataset = load_dataset('snli')
+    """Data preparation pipeline for DocNLI"""
+    df_train = pd.read_json(os.path.join(DOCNLI_DIR, 'train.json'))
+    df_dev = pd.read_json(os.path.join(DOCNLI_DIR, 'dev.json'))
+    df_test = pd.read_json(os.path.join(DOCNLI_DIR, 'test.json'))
+
+    dataset = DatasetDict(dict(
+        train=Dataset.from_pandas(df_train),
+        validation=Dataset.from_pandas(df_dev),
+        test=Dataset.from_pandas(df_test)
+    ))
 
     dataset = concatenate_datasets([dataset[i] for i in ['train', 'validation', 'test']])
 
@@ -78,8 +88,7 @@ def prepare_data(tokenizer) -> DatasetDict:
 
     # Clean dataset
     dataset = dataset.rename_column('label', 'labels')
-    dataset = dataset.filter(lambda x: is_new(x) and x['premise'] and x['hypothesis'])
-    dataset = dataset.filter(lambda x: x['labels'] in range(dataset.features['labels'].num_classes))
+    dataset = dataset.filter(lambda x: is_new(x) and x['premise'] and x['hypothesis'] and x['labels'])
 
     # Split dataset
     train_testvalid = dataset.train_test_split(test_size=2000, shuffle=True, seed=SEED)
@@ -105,16 +114,16 @@ def plot_confusion_matrix(y_true, y_pred):
 
 def main():
     model_name = 't5-base'
-    run_name = f'{model_name} Fine-tuning on SNLI'
+    run_name = f'{model_name} Fine-tuning on DocNLI'
     device = torch.device('cuda') if torch.cuda.is_available() else 'cpu'
 
     tokenizer = T5TokenizerFast.from_pretrained(model_name)
 
     if do_load_from_disk := True:
-        tokenized_dataset = load_from_disk(SNLI_PROCESSED_PATH)
+        tokenized_dataset = load_from_disk(DOCNLI_PROCESSED_PATH)
     else:
         tokenized_dataset = prepare_data(tokenizer)
-        tokenized_dataset.save_to_disk(SNLI_PROCESSED_PATH)
+        tokenized_dataset.save_to_disk(DOCNLI_PROCESSED_PATH)
 
     # Reformat dataset for pytorch
     tokenized_dataset.set_format(type='pt', columns=['input_ids', 'attention_mask', 'labels'])
@@ -126,13 +135,13 @@ def main():
     small_val_dataset = val_dataset.select(range(100))
 
     # Load model and train
-    # checkpoint = None
-    checkpoint = os.path.join(CHECKPOINT_DIR, run_name, 'checkpoint-14000')
+    checkpoint = None
+    # checkpoint = os.path.join(CHECKPOINT_DIR, run_name, 'checkpoint-1500')
 
     model = T5ForConditionalGeneration.from_pretrained(checkpoint if checkpoint else model_name)
     model.to(device)
 
-    if do_train := False:
+    if do_train := True:
         training_args = Seq2SeqTrainingArguments(
             output_dir=os.path.join(CHECKPOINT_DIR, run_name),
             overwrite_output_dir=True,
@@ -141,8 +150,8 @@ def main():
             evaluation_strategy='steps',
             # eval_steps=1000,
             num_train_epochs=3,
-            per_device_train_batch_size=3,
-            per_device_eval_batch_size=3,
+            per_device_train_batch_size=2,
+            per_device_eval_batch_size=1,
             # fp16=True,
             save_total_limit=10,
             generation_max_length=5,
@@ -208,8 +217,8 @@ def main():
         attention_mask=small_val_dataset['attention_mask'].to(device)
     )
     y_pred = [tokenizer.decode(i, skip_special_tokens=True) for i in y_pred]
-    y_pred = [small_val_dataset.features['raw_labels'].str2int(i) for i in y_pred]
-    y_true = small_val_dataset['raw_labels']
+    y_pred = [small_val_dataset['raw_labels'].index(i) for i in y_pred]
+    y_true = [small_val_dataset['raw_labels'].index(i) for i in small_val_dataset['raw_labels']]
 
     score = f1_score(y_true, y_pred, average='macro')
     print(f'f1 score: {score}')
@@ -220,3 +229,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# todo: train and make sure does not terminate prematurely due to cuda error
